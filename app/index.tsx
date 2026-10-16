@@ -78,6 +78,13 @@ export default function HomeScreen() {
         >
           <Text style={styles.actionBtnSecondaryText}>Tarifas de Peajes</Text>
         </TouchableOpacity>
+         <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
+            onPress={() => router.push('/reports')}
+        >
+        <Text style={styles.actionBtnText}>Mis Reportes</Text>
+  </TouchableOpacity>
+        
       </View>
 
       {/* Sync bar */}

@@ -48,6 +48,14 @@ export default function RootLayout() {
             title: 'Peajes y Tarifas SODA',
           }}
         />
+        
+    <Stack.Screen
+      name="reports"
+      options={{
+        title: 'Mis Reportes de Incidentes',
+      }}
+/>
+
       </Stack>
     </QueryClientProvider>
   );
