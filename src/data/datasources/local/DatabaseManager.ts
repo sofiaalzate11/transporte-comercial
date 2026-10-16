@@ -37,7 +37,26 @@ export class DatabaseManager {
 
       -- [INTEGRANTE 3: PEAJES] Pegar aqui tabla toll_stations e indices
 
-      -- [INTEGRANTE 4: REPORTES] Pegar aqui tabla user_reports e indices
+      
+      -- [Isabella: REPORTES]
+      CREATE TABLE IF NOT EXISTS user_reports (
+        id TEXT PRIMARY KEY NOT NULL,
+        road_name TEXT NOT NULL,
+        kilometer REAL NOT NULL,
+        description TEXT NOT NULL,
+        incident_type TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_user_reports_date
+      ON user_reports(created_at);
+
+
+      
     `);
+
+    
+    
   }
+  
 }
