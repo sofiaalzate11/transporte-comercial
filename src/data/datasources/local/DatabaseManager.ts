@@ -35,9 +35,30 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_road_alerts_resolved ON road_alerts(is_resolved);
       CREATE INDEX IF NOT EXISTS idx_road_alerts_dept ON road_alerts(department);
 
-      -- [INTEGRANTE 3: PEAJES] Pegar aqui tabla toll_stations e indices
+      CREATE TABLE IF NOT EXISTS toll_stations (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        department TEXT NOT NULL,
+        road_sector TEXT NOT NULL,
+        concessionaire TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        rates_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
 
-      -- [INTEGRANTE 4: REPORTES] Pegar aqui tabla user_reports e indices
+      CREATE INDEX IF NOT EXISTS idx_toll_stations_dept ON toll_stations(department);
+
+      CREATE TABLE IF NOT EXISTS user_reports (
+        id TEXT PRIMARY KEY NOT NULL,
+        road_name TEXT NOT NULL,
+        kilometer REAL NOT NULL,
+        description TEXT NOT NULL,
+        incident_type TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_user_reports_date ON user_reports(created_at);
     `);
   }
 }
