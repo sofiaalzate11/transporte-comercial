@@ -47,8 +47,13 @@ export class DatabaseManager {
         updated_at TEXT NOT NULL
       );
 
+<<<<<<< HEAD
+      
+      -- [Isabella: REPORTES]
+=======
       CREATE INDEX IF NOT EXISTS idx_toll_stations_dept ON toll_stations(department);
 
+>>>>>>> origin/main
       CREATE TABLE IF NOT EXISTS user_reports (
         id TEXT PRIMARY KEY NOT NULL,
         road_name TEXT NOT NULL,
@@ -58,7 +63,19 @@ export class DatabaseManager {
         created_at TEXT NOT NULL
       );
 
+<<<<<<< HEAD
+      CREATE INDEX IF NOT EXISTS idx_user_reports_date
+      ON user_reports(created_at);
+
+
+      
+=======
       CREATE INDEX IF NOT EXISTS idx_user_reports_date ON user_reports(created_at);
+>>>>>>> origin/main
     `);
+
+    
+    
   }
+  
 }
