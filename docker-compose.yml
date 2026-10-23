@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  postgres-postgis:
+    image: postgis/postgis:16-3.4
+    container_name: transporte_colombia_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: transporte_colombia
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
