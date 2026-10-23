@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diseño Técnico por Capas y Código Limpio - Transporte Colombia</title>
+  <style>
+    :root {
+      --primary: #1e3a8a;
+      --primary-light: #2563eb;
+      --secondary: #0f766e;
+      --layer1: #2563eb;
+      --layer2: #059669;
+      --layer3: #d97706;
+      --text: #1f2937;
+      --text-muted: #4b5563;
+      --bg: #f9fafb;
+      --card-bg: #ffffff;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background-color: var(--bg);
+      line-height: 1.6;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 940px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      padding: 40px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-bottom: 30px;
+    }
+
+    .btn-print {
+      background: var(--primary-light);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    .btn-print:hover {
+      background: var(--primary);
+    }
+
+    h1 {
+      font-size: 25px;
+      color: var(--primary);
+      margin-bottom: 6px;
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: var(--secondary);
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    h2 {
+      font-size: 18px;
+      color: var(--primary);
+      margin-top: 32px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+      page-break-after: avoid;
+    }
+
+    h3 {
+      font-size: 15px;
+      color: var(--text);
+      margin-top: 18px;
+      margin-bottom: 8px;
+      page-break-after: avoid;
+    }
+
+    p, ul, ol {
+      margin-bottom: 14px;
+      font-size: 13.5px;
+    }
+
+    ul, ol {
+      padding-left: 22px;
+    }
+
+    li {
+      margin-bottom: 5px;
+    }
+
+    .prologue {
+      background: #f0fdf4;
+      border-left: 4px solid var(--secondary);
+      padding: 16px;
+      border-radius: 4px;
+      margin-bottom: 24px;
+      font-size: 13.5px;
+    }
+
+    .layer-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      background: #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      page-break-inside: avoid;
+    }
+
+    .layer-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: white;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-layer1 { background: var(--layer1); }
+    .badge-layer2 { background: var(--layer2); }
+    .badge-layer3 { background: var(--layer3); }
+
+    .concept-box {
+      background: #eff6ff;
+      border-left: 4px solid var(--primary-light);
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin: 14px 0;
+      font-size: 13px;
+    }
+
+    .pattern-box {
+      background: #fdf4ff;
+      border-left: 4px solid #a855f7;
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin: 14px 0;
+      font-size: 13px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 12.5px;
+      page-break-inside: avoid;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: var(--primary);
+    }
+
+    pre {
+      background: #1e293b;
+      color: #f8fafc;
+      padding: 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      margin: 14px 0;
+      page-break-inside: avoid;
+    }
+
+    code {
+      font-family: "Courier New", Courier, monospace;
+      background: var(--code-bg);
+      color: #be185d;
+      padding: 2px 4px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    pre code {
+      background: transparent;
+      color: inherit;
+      padding: 0;
+    }
+
+    .formula {
+      background: #f8fafc;
+      border: 1px dashed #94a3b8;
+      padding: 12px;
+      text-align: center;
+      font-family: "Courier New", monospace;
+      font-size: 13.5px;
+      font-weight: bold;
+      color: var(--primary);
+      margin: 14px 0;
+      border-radius: 6px;
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      .container {
+        box-shadow: none;
+        padding: 0;
+        max-width: 100%;
+      }
+      .action-bar {
+        display: none !important;
+      }
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+      pre {
+        background: #f1f5f9;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+      }
+      .layer-card {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="action-bar">
+      <div>
+        <strong>Arquitectura de Software por Capas y Código Limpio</strong>
+        <p style="margin: 0; font-size: 12px; color: var(--text-muted);">Especificación estructurada por capas con conceptos, tecnologías y patrones.</p>
+      </div>
+      <button class="btn-print" onclick="window.print()">
+        🖨️ Guardar / Imprimir como PDF
+      </button>
+    </div>
+
+    <h1>Proyecto Académico: Transporte y Estado Vial en Colombia</h1>
+    <div class="subtitle">Especificación Técnica por Capas y Patrones de Código Limpio (React Native)</div>
+
+    <div class="prologue">
+      <strong>Prólogo Pedagógico:</strong> Para garantizar claridad absoluta en el aprendizaje del equipo, este documento organiza cada tecnología, concepto y módulo bajo la estructura canónica de <strong>Tres Capas de Software</strong>, detallando para cada una: su responsabilidad, los conceptos teóricos subyacentes, las tecnologías oficiales de React Native y los patrones de código limpio aplicados.
+    </div>
+
+    <!-- CAPA 1 -->
+    <div class="layer-card" style="border-top: 4px solid var(--layer1);">
+      <span class="layer-badge badge-layer1">Capa 1: Presentación (UI, Navegación y Estado)</span>
+      
+      <h3>1. Responsabilidad de la Capa</h3>
+      <p>Es la capa más externa del sistema. Captura las interacciones del usuario (toques, formularios, navegación) y dibuja la interfaz gráfica (mapa, tarjetas de alertas, estado de envíos). <strong>Tiene prohibido</strong> ejecutar consultas directas a SQLite o realizar cálculos matemáticos de demoras.</p>
+
+      <div class="concept-box">
+        <strong>Conceptos Teóricos para Principiantes:</strong>
+        <ul>
+          <li><strong>El Hilo Principal (Main/UI Thread):</strong> La interfaz se refresca a 60 fps en un solo hilo. Todo cálculo pesado debe ejecutarse fuera de este hilo para evitar congelamientos (*Jank*).</li>
+          <li><strong>Renderizado Declarativo:</strong> La interfaz describe visualmente el estado: *"Si hay retraso, dibuja la alerta en rojo; de lo contrario, en verde"*.</li>
+          <li><strong>Estado Reactivo en Memoria:</strong> Variables que al mutar notifican a los componentes para redibujarse automáticamente sin recargar la pantalla.</li>
+        </ul>
+      </div>
+
+      <h3>Tecnologías y Módulos Oficiales</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Tecnología</th>
+            <th>Propósito en la Capa</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>expo-router</code></td>
+            <td>Enrutador declarativo basado en carpetas (Pila pública <code>app/(auth)</code> y privada <code>app/(tabs)</code>).</td>
+          </tr>
+          <tr>
+            <td><code>react-native</code></td>
+            <td>Componentes visuales nativos (<code>View</code>, <code>Text</code>, <code>FlatList</code>, <code>TextInput</code>, <code>TouchableOpacity</code>).</td>
+          </tr>
+          <tr>
+            <td><code>zustand</code></td>
+            <td>Store de estado global en memoria para la sesión activa del conductor y la ruta seleccionada.</td>
+          </tr>
+          <tr>
+            <td><code>@maplibre/maplibre-react-native</code></td>
+            <td>Motor de renderizado visual en GPU para mapas vectoriales, polilíneas de ruta y marcadores de incidentes.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pattern-box">
+        <strong>Patrones de Código Limpio (Clean Code Patterns):</strong>
+        <ul>
+          <li><strong>Smart & Dumb Components (Contenedor y Vista):</strong> Los componentes visuales (ej. <code>TarjetaIncidente.tsx</code>) solo reciben datos por <code>props</code>; no conocen la base de datos ni las llamadas de red.</li>
+          <li><strong>Auth Guard Pattern:</strong> El archivo raíz <code>_layout.tsx</code> valida el token de sesión y destruye de memoria las pantallas privadas si el usuario no está autenticado.</li>
+          <li><strong>Flujo Unidireccional de Datos:</strong> Los datos fluyen hacia abajo y los eventos suben por funciones de retorno (callbacks).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPA 2 -->
+    <div class="layer-card" style="border-top: 4px solid var(--layer2);">
+      <span class="layer-badge badge-layer2">Capa 2: Lógica de Negocio y Dominio (Services / Casos de Uso)</span>
+      
+      <h3>1. Responsabilidad de la Capa</h3>
+      <p>Es el núcleo de la aplicación. Contiene las reglas del negocio de transporte: el algoritmo de cálculo de retrasos ($\Delta T$), la detección de cierres viales sobre la ruta y las validaciones de manifiestos. <strong>Es 100% agnóstica de frameworks</strong>: no importa código de React Native, ni SQLite, ni Axios.</p>
+
+      <div class="concept-box">
+        <strong>Conceptos Teóricos para Principiantes:</strong>
+        <ul>
+          <li><strong>Funciones Puras e Inmutabilidad:</strong> Funciones que ante los mismos parámetros siempre producen el mismo resultado sin efectos secundarios externos.</li>
+          <li><strong>Geometría Computacional Básica:</strong> Modelado sobre el elipsoide WGS84 para calcular distancias geodésicas ortogonales entre un incidente y la línea de la vía.</li>
+          <li><strong>Complejidad Temporal:</strong> Algoritmos diseñados para evaluar tramos e incidentes en tiempo lineal $O(N)$ sin ciclos anidados costosos.</li>
+        </ul>
+      </div>
+
+      <h3>Tecnologías y Módulos Oficiales</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Tecnología</th>
+            <th>Propósito en la Capa</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>TypeScript</code></td>
+            <td>Definición rigurosa de modelos inmutables (<code>Ruta</code>, <code>Tramo</code>, <code>Incidente</code>) y contratos de interfaces.</td>
+          </tr>
+          <tr>
+            <td><code>@turf/turf</code></td>
+            <td>Algoritmos geodésicos para medir distancias sobre la superficie terrestre e intersección de radios de afectación.</td>
+          </tr>
+          <tr>
+            <td><code>date-fns</code></td>
+            <td>Aritmética de tiempo determinista y cálculo de diferencias horarias en zona de Colombia (<code>UTC-5</code>).</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pattern-box">
+        <strong>Patrones de Código Limpio (Clean Code Patterns):</strong>
+        <ul>
+          <li><strong>Principio de Responsabilidad Única (SRP):</strong> Cada caso de uso resuelve una sola tarea (ej. <code>CalcularRetrasoRutaUseCase.ts</code>).</li>
+          <li><strong>Inversión de Dependencias (DIP):</strong> La lógica no se acopla a la base de datos real; define interfaces abstractas (ej. <code>IRutaRepository.ts</code>) que la Capa 3 implementa.</li>
+          <li><strong>Objetos de Valor (Value Objects):</strong> Tipos inmutables auto-validados (ej. <code>CoordenadaGPS</code> con rangos válidos de latitud y longitud).</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CAPA 3 -->
+    <div class="layer-card" style="border-top: 4px solid var(--layer3);">
+      <span class="layer-badge badge-layer3">Capa 3: Datos e Infraestructura (Persistencia y Red)</span>
+      
+      <h3>1. Responsabilidad de la Capa</h3>
+      <p>Es la encargada de comunicarse con el mundo exterior: la base de datos local SQLite en el teléfono, los chips GNSS (GPS), el enclave seguro del hardware y los servidores web de INVIAS y datos abiertos del Estado. <strong>Tiene prohibido</strong> tomar decisiones sobre reglas de negocio.</p>
+
+      <div class="concept-box">
+        <strong>Conceptos Teóricos para Principiantes:</strong>
+        <ul>
+          <li><strong>Propiedades ACID en Bases de Datos:</strong> Atomicidad, Consistencia, Aislamiento y Durabilidad. Si el teléfono se apaga de golpe, la transacción se revierte y la base de datos no se corrompe.</li>
+          <li><strong>Búsquedas B-Tree vs. Búsquedas Secuenciales:</strong> Un índice en SQLite permite búsquedas logarítmicas $O(\log N)$ en lugar de recorrer toda la tabla $O(N)$.</li>
+          <li><strong>Gestión de Procesos en Segundo Plano:</strong> Los sistemas operativos móviles suspenden apps inactivas para ahorrar energía. Se requiere un *Foreground Service* nativo para telemetría.</li>
+        </ul>
+      </div>
+
+      <h3>Tecnologías y Módulos Oficiales</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Tecnología</th>
+            <th>Propósito en la Capa</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>expo-sqlite</code></td>
+            <td>Motor relacional embebido local para garantizar operatividad 100% <strong>Offline-First</strong>.</td>
+          </tr>
+          <tr>
+            <td><code>expo-secure-store</code></td>
+            <td>Cifrado en hardware usando <strong>Android Keystore</strong> y <strong>iOS Keychain</strong> para tokens de sesión.</td>
+          </tr>
+          <tr>
+            <td><code>expo-location</code> + <code>expo-task-manager</code></td>
+            <td>Captura periódica de coordenadas GPS registradas ante el kernel del sistema operativo.</td>
+          </tr>
+          <tr>
+            <td><code>@tanstack/react-query</code></td>
+            <td>Caché asíncrona, deduplicación de consultas y reintentos automáticos con retroceso exponencial.</td>
+          </tr>
+          <tr>
+            <td><code>@react-native-community/netinfo</code></td>
+            <td>Detección de conectividad de red celular/WiFi para disparar sincronizaciones diferidas.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="pattern-box">
+        <strong>Patrones de Código Limpio (Clean Code Patterns):</strong>
+        <ul>
+          <li><strong>Patrón Repositorio (Repository Pattern):</strong> Abstrae el origen de la información. La app solicita una ruta y el repositorio decide si la lee de SQLite o la descarga de internet.</li>
+          <li><strong>Patrón Adaptador / Mapeador (Adapter / Mapper):</strong> Limpia y transforma los GeoJSON de ArcGIS de INVIAS en objetos limpios de dominio.</li>
+          <li><strong>Data Transfer Object (DTO):</strong> Contratos de datos de entrada/salida de red aislados del modelo de base de datos.</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- ESQUEMA SQL -->
+    <h2>4. Modelo de Datos Relacional (SQLite DDL en Capa 3)</h2>
+    <pre><code>-- 1. Usuarios / Conductores
+CREATE TABLE IF NOT EXISTS usuarios (
+    id TEXT PRIMARY KEY,
+    nombre TEXT NOT NULL,
+    documento TEXT NOT NULL UNIQUE,
+    rol TEXT CHECK(rol IN ('conductor', 'operador', 'consulta')) DEFAULT 'conductor',
+    token_sesion TEXT,
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Rutas Planificadas
+CREATE TABLE IF NOT EXISTS rutas_entrega (
+    id TEXT PRIMARY KEY,
+    usuario_id TEXT NOT NULL,
+    codigo_manifiesto TEXT,
+    origen_nombre TEXT NOT NULL,
+    origen_lat REAL NOT NULL,
+    origen_lon REAL NOT NULL,
+    destino_nombre TEXT NOT NULL,
+    destino_lat REAL NOT NULL,
+    destino_lon REAL NOT NULL,
+    eta_pactado DATETIME NOT NULL,
+    eta_recalculado DATETIME,
+    distancia_total_km REAL NOT NULL,
+    tiempo_estimado_base_min INTEGER NOT NULL,
+    estado TEXT CHECK(estado IN ('pendiente', 'en_ruta', 'completada', 'retrasada', 'cancelada')) DEFAULT 'pendiente',
+    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+);
+
+-- 3. Segmentos de la Ruta
+CREATE TABLE IF NOT EXISTS tramos_ruta (
+    id TEXT PRIMARY KEY,
+    ruta_id TEXT NOT NULL,
+    orden_secuencia INTEGER NOT NULL,
+    origen_segmento_lat REAL NOT NULL,
+    origen_segmento_lon REAL NOT NULL,
+    destino_segmento_lat REAL NOT NULL,
+    destino_segmento_lon REAL NOT NULL,
+    via_codigo TEXT,
+    distancia_km REAL NOT NULL,
+    tiempo_base_min INTEGER NOT NULL,
+    FOREIGN KEY (ruta_id) REFERENCES rutas_entrega(id) ON DELETE CASCADE
+);
+
+-- 4. Incidentes y Estado Vial
+CREATE TABLE IF NOT EXISTS incidentes_viales (
+    id TEXT PRIMARY KEY,
+    id_fuente_externa TEXT,
+    tipo_evento TEXT CHECK(tipo_evento IN ('cierre_total', 'paso_a_un_carril', 'derrumbe', 'mantenimiento', 'accidente', 'clima', 'manifestacion')) NOT NULL,
+    gravedad TEXT CHECK(gravedad IN ('baja', 'media', 'alta', 'critica')) NOT NULL,
+    descripcion TEXT,
+    via_codigo TEXT,
+    ubicacion_lat REAL NOT NULL,
+    ubicacion_lon REAL NOT NULL,
+    radio_afectacion_km REAL DEFAULT 1.0,
+    retraso_estimado_min INTEGER DEFAULT 0,
+    fuente TEXT NOT NULL,
+    estado TEXT CHECK(estado IN ('activo', 'resuelto', 'verificado')) DEFAULT 'activo',
+    fecha_reporte DATETIME NOT NULL,
+    actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Búfer de Telemetría GPS Local
+CREATE TABLE IF NOT EXISTS telemetria_puntos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ruta_id TEXT NOT NULL,
+    latitud REAL NOT NULL,
+    longitud REAL NOT NULL,
+    velocidad_kmh REAL,
+    altitud REAL,
+    bateria_nivel REAL,
+    timestamp_captura DATETIME NOT NULL,
+    sincronizado INTEGER DEFAULT 0,
+    FOREIGN KEY (ruta_id) REFERENCES rutas_entrega(id) ON DELETE CASCADE
+);
+
+-- 6. Historial de Evaluaciones de Retraso
+CREATE TABLE IF NOT EXISTS evaluaciones_retraso (
+    id TEXT PRIMARY KEY,
+    ruta_id TEXT NOT NULL,
+    incidente_id TEXT,
+    retraso_delta_min INTEGER NOT NULL,
+    causa_principal TEXT NOT NULL,
+    timestamp_calculo DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (ruta_id) REFERENCES rutas_entrega(id) ON DELETE CASCADE,
+    FOREIGN KEY (incidente_id) REFERENCES incidentes_viales(id) ON DELETE SET NULL
+);
+
+-- Índices B-Tree Estratégicos
+CREATE INDEX IF NOT EXISTS idx_telemetria_sync ON telemetria_puntos(ruta_id, sincronizado);
+CREATE INDEX IF NOT EXISTS idx_incidentes_espacial ON incidentes_viales(ubicacion_lat, ubicacion_lon, estado);
+CREATE INDEX IF NOT EXISTS idx_tramos_orden ON tramos_ruta(ruta_id, orden_secuencia);
+CREATE INDEX IF NOT EXISTS idx_rutas_estado ON rutas_entrega(usuario_id, estado);</code></pre>
+
+    <!-- APIS -->
+    <h2>5. Catálogo de APIs y Fuentes Viales de Colombia (Capa 3)</h2>
+    <ul>
+      <li><strong>Portal de Datos Abiertos (datos.gov.co):</strong> Socrata Open Data API (SODA). Inventario de vías primarias y peajes concesionados para precargar la base de datos local.</li>
+      <li><strong>Geoportal INVIAS / Sistema HERMES:</strong> ArcGIS REST Services. Reportes oficiales en tiempo real del #767 (cierres totales, pasos a un carril y derrumbes).</li>
+      <li><strong>Alertas Hidrometeorológicas del IDEAM:</strong> Servicios WMS/GeoJSON con niveles de amenaza por remoción en masa en zonas de cordillera.</li>
+      <li><strong>OpenStreetMap (OSM) / OSRM:</strong> Trazado de la polilínea de la ruta base origen-destino sin incurrir en costos de licencias comerciales.</li>
+      <li><strong>TomTom / HERE Traffic API:</strong> Medición de velocidades y demoras dinámicas por congestión en tiempo real.</li>
+    </ul>
+
+    <!-- FORMULA -->
+    <h2>6. Motor Matemático de Cálculo de Retraso (Capa 2)</h2>
+    <div class="formula">
+      ETA_recalculado = Tiempo_actual + Σ(T_tramo_i) + Σ(D_incidente_j)
+    </div>
+    <div class="formula">
+      ΔT = ETA_recalculado - ETA_pactado
+    </div>
+    <p>Donde el retraso $\Delta T > 0$ se clasifica en minutos e informa proactivamente a la logística de transporte si el envío llegará a tiempo.</p>
+
+    <!-- FOLDER STRUCTURE -->
+    <h2>7. Mapeo Físico de las Capas en el Código (Folder Structure)</h2>
+    <pre><code>transporte_colombia_rn/
+├── app/                           <-- ENRUTADOR DE CAPA 1 (Expo Router)
+│   ├── (auth)/                    <-- Pila Pública (login.tsx, register.tsx)
+│   ├── (tabs)/                    <-- Pila Privada (rutas.tsx, mapa.tsx, perfil.tsx)
+│   └── _layout.tsx                <-- Auth Guard (Verifica token antes de entrar)
+│
+├── src/
+│   ├── presentation/              <-- [CAPA 1: PRESENTACIÓN]
+│   │   ├── components/            <-- TarjetaIncidente.tsx, MapaView.tsx, BotonPrimario.tsx
+│   │   └── store/                 <-- useAuthStore.ts, useRutaStore.ts (Zustand)
+│   │
+│   ├── domain/                    <-- [CAPA 2: LÓGICA DE NEGOCIO / DOMINIO]
+│   │   ├── models/                <-- Ruta.ts, Incidente.ts, Tramo.ts, Usuario.ts
+│   │   ├── repositories/          <-- IRutaRepository.ts, IIncidenteRepository.ts (Contratos)
+│   │   └── usecases/              <-- CalcularRetrasoRuta.ts, EvaluarImpactoIncidente.ts
+│   │
+│   └── data/                      <-- [CAPA 3: DATOS E INFRAESTRUCTURA]
+│       ├── datasources/
+│       │   ├── local/             <-- SQLite (database.ts, tables.ts)
+│       │   ├── remote/            <-- InviasApiService.ts, DatosAbiertosService.ts
+│       │   └── secure/            <-- SessionStorage.ts (expo-secure-store)
+│       ├── mappers/               <-- InviasIncidentMapper.ts (Transforma GeoJSON a Entidad)
+│       └── repositories/          <-- RutaRepositoryImpl.ts, IncidenteRepositoryImpl.ts
+│
+├── app.json                       <-- Configuración declarativa de Expo y permisos GPS
+├── package.json                   <-- Dependencias oficiales del proyecto
+└── tsconfig.json                  <-- Configuración de TypeScript y alias de rutas</code></pre>
+
+  </div>
+
+</body>
+</html>
