@@ -18,7 +18,7 @@ export default function MapaScreen() {
     <View style={styles.container}>
       <MapLibreGL.MapView
         style={styles.map}
-        styleURL="https://demotiles.maplibre.org/style.json"
+        mapStyle="https://demotiles.maplibre.org/style.json"
       >
         <MapLibreGL.Camera
           zoomLevel={6.5}

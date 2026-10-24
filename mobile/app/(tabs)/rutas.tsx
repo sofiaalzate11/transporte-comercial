@@ -72,7 +72,7 @@ export default function RutasScreen() {
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No hay rutas asignadas</Text>
             </View>
-          ) : null
+          ) : undefined
         }
         contentContainerStyle={styles.listContent}
       />
