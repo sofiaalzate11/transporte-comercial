@@ -1,4 +1,4 @@
-import { RouteStatus } from '../../../../shared/types';
+import { RouteStatus } from '../../shared/types';
 
 export interface RouteSegmentModel {
   id: string;

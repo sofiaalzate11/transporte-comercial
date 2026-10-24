@@ -2,12 +2,13 @@ import axios, { AxiosInstance } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { RouteModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
-import { IDelayEvaluationResult, ITelemetryPayload } from '../../../../shared/types';
+import { IDelayEvaluationResult, ITelemetryPayload } from '../../shared/types';
+import { API_BASE_URL } from '../config/api.config';
 
 export class ApiDataSource {
   private client: AxiosInstance;
 
-  constructor(baseURL: string = 'http://10.0.2.2:3000') {
+  constructor(baseURL: string = API_BASE_URL) {
     // 10.0.2.2 apunta al localhost de la máquina anfitriona en el emulador de Android
     this.client = axios.create({
       baseURL,

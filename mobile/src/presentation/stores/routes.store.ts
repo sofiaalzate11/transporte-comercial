@@ -4,7 +4,7 @@ import { IncidentModel } from '../../domain/entities/incident.model';
 import { RouteRepositoryImpl } from '../../data/repositories/route.repository.impl';
 import { SQLiteDataSource } from '../../data/datasources/sqlite.datasource';
 import { ApiDataSource } from '../../data/datasources/api.datasource';
-import { IDelayEvaluationResult } from '../../../../shared/types';
+import { IDelayEvaluationResult } from '../../shared/types';
 
 const sqliteDs = new SQLiteDataSource();
 const apiDs = new ApiDataSource();

@@ -1,159 +1,128 @@
-# Documento Maestro: Monitoreo Vial y Retrasos de Transporte (Colombia)
+# Sistema de Monitoreo Vial y Control de Retrasos (Transporte Colombia)
 
-## 1. Alcance Funcional e Ideas del Sistema
+Sistema distribuido Offline-First para transporte de carga en corredores viales colombianos. Integra una API REST en NestJS con PostgreSQL/PostGIS y una aplicación móvil en React Native (Expo) con persistencia local SQLite y mapas MapLibre.
 
-* Registro e inicio de sesión por roles: conductor, operador y cliente.
-* Consulta de estado vial en tiempo real con datos de INVIAS #767.
-* Visualización cartográfica de incidentes: cierres totales, pasos a un carril y derrumbes.
-* Registro continuo de telemetría GPS en segundo plano con bajo consumo.
-* Almacenamiento local persistente para operar en zonas sin cobertura celular.
-* Sincronización asíncrona bidireccional al recuperar señal móvil.
-* Motor analítico para calcular retrasos respecto al horario pactado.
+---
+
+## 1. Estructura del Monorepo
+
+El repositorio organiza responsabilidades técnicas en cuatro áreas independientes:
+
+```text
+transporte_colombia_rn/
+├── backend/                  # Servidor API REST en NestJS
+│   ├── src/
+│   │   ├── auth/             # Autenticación JWT y guards
+│   │   ├── users/            # Entidades y gestión de usuarios
+│   │   ├── routes/           # Rutas de transporte y tramos viales
+│   │   ├── road-incidents/   # Novedades INVIAS y eventos en carretera
+│   │   ├── telemetry/        # Ingesta masiva de coordenadas GPS
+│   │   ├── delay-engine/     # Algoritmo de cálculo de demoras (Haversine)
+│   │   ├── database/         # Configuración TypeORM y PostgreSQL
+│   │   └── main.ts           # Bootstrap y Swagger UI (/api/docs)
+│   └── package.json
+│
+├── mobile/                   # Aplicación móvil en React Native (Expo SDK 52)
+│   ├── app/                  # Enrutador basado en archivos (expo-router v4)
+│   │   ├── (auth)/login.tsx  # Pantalla de acceso
+│   │   └── (tabs)/           # Pestañas: Rutas y Mapa Vial
+│   ├── src/
+│   │   ├── domain/           # Capa 2: Reglas puras y casos de uso
+│   │   ├── data/             # Capa 3: Persistencia SQLite y cliente HTTP
+│   │   └── presentation/     # Capa 1: Tiendas Zustand y componentes UI
+│   └── package.json
+│
+├── shared/                   # Tipos TypeScript y contratos comunes
+│   └── types/index.ts        # Interfaces compartidas cliente-servidor
+│
+├── docs/                     # Especificaciones técnicas y guías de estudio
+├── docker-compose.yml        # PostgreSQL 16 con extensión PostGIS
+└── AGENTS.md                 # Directivas del proyecto y reglas de código
+```
 
 ---
 
 ## 2. Arquitectura de Software por Capas
 
-### Capa 1: Presentación
-* Maneja la interacción con el usuario y renderizado de componentes.
-* Utiliza enrutamiento declarativo y estado global reactivo en memoria.
-* Prohibido procesar consultas SQL o cálculos matemáticos en esta capa.
+El cliente móvil implementa **Clean Architecture** para desacoplar la lógica de negocio de la interfaz:
 
-### Capa 2: Lógica de Negocio y Dominio
-* Contiene reglas puras de transporte y algoritmos de demoras.
-* Independiente de librerías de interfaz gráfica y motores de base de datos.
-* Aplica cálculo geodésico sobre coordenadas bajo el elipsoide WGS84.
-
-### Capa 3: Datos e Infraestructura
-* Gestiona base de datos SQLite local bajo esquema relacional.
-* Almacena tokens de sesión cifrados en hardware con Keystore y Keychain.
-* Consume endpoints HTTP de datos abiertos gubernamentales y servicios REST.
-
----
-
-## 3. Modelo Relacional SQL (SQLite DDL)
-
-```sql
-CREATE TABLE IF NOT EXISTS usuarios (
-    id TEXT PRIMARY KEY,
-    nombre TEXT NOT NULL,
-    documento TEXT NOT NULL UNIQUE,
-    rol TEXT CHECK(rol IN ('conductor', 'operador', 'consulta')) DEFAULT 'conductor',
-    token_sesion TEXT,
-    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS rutas_entrega (
-    id TEXT PRIMARY KEY,
-    usuario_id TEXT NOT NULL,
-    codigo_manifiesto TEXT,
-    origen_nombre TEXT NOT NULL,
-    origen_lat REAL NOT NULL,
-    origen_lon REAL NOT NULL,
-    destino_nombre TEXT NOT NULL,
-    destino_lat REAL NOT NULL,
-    destino_lon REAL NOT NULL,
-    eta_pactado DATETIME NOT NULL,
-    eta_recalculado DATETIME,
-    distancia_total_km REAL NOT NULL,
-    tiempo_estimado_base_min INTEGER NOT NULL,
-    estado TEXT CHECK(estado IN ('pendiente', 'en_ruta', 'completada', 'retrasada', 'cancelada')) DEFAULT 'pendiente',
-    creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS tramos_ruta (
-    id TEXT PRIMARY KEY,
-    ruta_id TEXT NOT NULL,
-    orden_secuencia INTEGER NOT NULL,
-    origen_segmento_lat REAL NOT NULL,
-    origen_segmento_lon REAL NOT NULL,
-    destino_segmento_lat REAL NOT NULL,
-    destino_segmento_lon REAL NOT NULL,
-    via_codigo TEXT,
-    distancia_km REAL NOT NULL,
-    tiempo_base_min INTEGER NOT NULL,
-    FOREIGN KEY (ruta_id) REFERENCES rutas_entrega(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS incidentes_viales (
-    id TEXT PRIMARY KEY,
-    id_fuente_externa TEXT,
-    tipo_evento TEXT CHECK(tipo_evento IN ('cierre_total', 'paso_a_un_carril', 'derrumbe', 'mantenimiento', 'accidente', 'clima', 'manifestacion')) NOT NULL,
-    gravedad TEXT CHECK(gravedad IN ('baja', 'media', 'alta', 'critica')) NOT NULL,
-    descripcion TEXT,
-    via_codigo TEXT,
-    ubicacion_lat REAL NOT NULL,
-    ubicacion_lon REAL NOT NULL,
-    radio_afectacion_km REAL DEFAULT 1.0,
-    retraso_estimado_min INTEGER DEFAULT 0,
-    fuente TEXT NOT NULL,
-    estado TEXT CHECK(estado IN ('activo', 'resuelto', 'verificado')) DEFAULT 'activo',
-    fecha_reporte DATETIME NOT NULL,
-    actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS telemetria_puntos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ruta_id TEXT NOT NULL,
-    latitud REAL NOT NULL,
-    longitud REAL NOT NULL,
-    velocidad_kmh REAL,
-    altitud REAL,
-    bateria_nivel REAL,
-    timestamp_captura DATETIME NOT NULL,
-    sincronizado INTEGER DEFAULT 0,
-    FOREIGN KEY (ruta_id) REFERENCES rutas_entrega(id) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS evaluaciones_retraso (
-    id TEXT PRIMARY KEY,
-    ruta_id TEXT NOT NULL,
-    incidente_id TEXT,
-    retraso_delta_min INTEGER NOT NULL,
-    causa_principal TEXT NOT NULL,
-    timestamp_calculo DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (ruta_id) REFERENCES rutas_entrega(id) ON DELETE CASCADE,
-    FOREIGN KEY (incidente_id) REFERENCES incidentes_viales(id) ON DELETE SET NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_telemetria_sync ON telemetria_puntos(ruta_id, sincronizado);
-CREATE INDEX IF NOT EXISTS idx_incidentes_espacial ON incidentes_viales(ubicacion_lat, ubicacion_lon, estado);
-CREATE INDEX IF NOT EXISTS idx_tramos_orden ON tramos_ruta(ruta_id, orden_secuencia);
-CREATE INDEX IF NOT EXISTS idx_rutas_estado ON rutas_entrega(usuario_id, estado);
-```
+* **Capa 1: Presentación (`mobile/app/`, `mobile/src/presentation/`):**
+  * Maneja la interacción del usuario y renderizado de componentes.
+  * Tiendas reactivas con **Zustand** y gestión asíncrona con **TanStack Query**.
+  * Prohibido ejecutar consultas SQL directas o fórmulas matemáticas en esta capa.
+* **Capa 2: Lógica de Negocio (`mobile/src/domain/`):**
+  * Casos de uso puros en TypeScript (`CalculateDelayUseCase`).
+  * Sin dependencias de React Native, APIs externas ni SQLite.
+* **Capa 3: Datos e Infraestructura (`mobile/src/data/`):**
+  * Persistencia local relacional con **expo-sqlite** bajo modo WAL.
+  * Tareas de telemetría GPS en segundo plano con **expo-task-manager**.
+  * Clientes HTTP con **Axios** e interceptores de token en **expo-secure-store**.
 
 ---
 
-## 4. Dependencias Oficiales Vigentes
+## 3. Modelo de Datos Relacional
 
-* `expo`: Versión SDK actual para generación de compilación nativa.
-* `expo-router`: Sistema declarativo de rutas y control de sesión.
-* `expo-sqlite`: Motor de base de datos relacional transaccional local.
-* `expo-secure-store`: Cifrado por hardware en Keystore y Keychain.
-* `expo-location`: Captura de posición mediante fusión de sensores GNSS.
-* `expo-task-manager`: Manejo de servicios nativos en segundo plano.
-* `@maplibre/maplibre-react-native`: Renderizado de mapas vectoriales con caché.
-* `@turf/turf`: Geometría computacional para cálculo geodésico y radios.
-* `zustand`: Gestión de estado global en memoria.
-* `@tanstack/react-query`: Control de estados asíncronos y caché de red.
-* `@react-native-community/netinfo`: Monitoreo de conectividad a internet.
-* `date-fns`: Operaciones deterministas con marcas de tiempo en UTC-5.
+### Tablas del Servidor (PostgreSQL / TypeORM)
+1. `usuarios`: Identificación, rol (`conductor`, `operador`, `consulta`) y hash de contraseña.
+2. `rutas_entrega`: Origen, destino, coordenadas, ETA pactado y estado.
+3. `tramos_ruta`: Subtramos secuenciales con distancia en km y tiempo base.
+4. `incidentes_viales`: Eventos oficiales (#767) con radio de afectación y minutos de demora.
+5. `telemetria_puntos`: Búfer masivo de coordenadas GPS, velocidad y altitud.
+
+### Persistencia Móvil Offline (SQLite)
+* La aplicación mantiene réplica local de rutas e incidentes para operar en zonas de cordillera sin cobertura celular.
+* Registra puntos GPS en una tabla búfer (`telemetria_buffer`) y los sincroniza automáticamente cuando detecta conexión de red.
 
 ---
 
-## 5. Fuentes de Datos y APIs Viales de Colombia
+## 4. Motor Analítico de Retraso Vial
 
-* **Datos Abiertos Colombia (`datos.gov.co`):** API SODA para inventario vial y peajes.
-* **Geoportal INVIAS / HERMES (`hermes.invias.gov.co`):** Novedades oficiales del programa #767.
-* **IDEAM:** Alertas climáticas y riesgo por deslizamientos de tierra.
-* **OpenStreetMap / OSRM:** Enrutamiento base y topología vial sin costo comercial.
-* **TomTom Traffic API:** Velocidades de flujo y congestión en tiempo real.
+El retraso se evalúa cruzando los tramos viales con los radios de afectación de incidentes activos mediante la **fórmula de Haversine**:
 
----
+$$\Delta\sigma = 2 \arcsin \left( \sqrt{\sin^2\left(\frac{\Delta\phi}{2}\right) + \cos(\phi_1)\cos(\phi_2)\sin^2\left(\frac{\Delta\lambda}{2}\right)} \right)$$
 
-## 6. Algoritmo de Retraso
+$$d = R \cdot \Delta\sigma \quad (R = 6371\text{ km})$$
 
-$$\text{ETA}_{\text{recalculado}} = \text{Tiempo}_{\text{actual}} + \sum_{i=1}^{n} T_{\text{tramo}_i} + \sum_{j=1}^{m} D_{\text{incidente}_j}$$
+Cálculo del retraso acumulado y proyección de llegada:
+
+$$\text{ETA}_{\text{recalculado}} = \text{ETA}_{\text{pactado}} + \sum_{j=1}^{m} D_{\text{incidente}_j}$$
 
 $$\Delta T = \text{ETA}_{\text{recalculado}} - \text{ETA}_{\text{pactado}}$$
+
+---
+
+## 5. Distribución de Ramas y Autoría en Git
+
+El trabajo técnico está distribuido en cuatro ramas para preservar la autoría de cada integrante:
+
+| Integrante | Rama GitHub | Módulo asignado |
+| :--- | :--- | :--- |
+| **Sofia Alzate** | `Sofia` | Contratos compartidos (`shared/types`), especificaciones y `docs/`. |
+| **Carlos** | `Carlos` | Backend NestJS, TypeORM, Swagger y PostgreSQL. |
+| **Isabella** | `Isabella` | Capas de dominio puro y persistencia SQLite en cliente móvil. |
+| **Duber** | `Duber` | Vistas Expo Router v4, componentes UI y reestructuración general. |
+
+---
+
+## 6. Instrucciones de Ejecución
+
+### Requisitos Previos
+* Node.js v20+ o v22+
+* PostgreSQL activo en puerto `5432` (nativo de Windows o mediante `docker compose up -d`)
+
+### 1. Iniciar el Backend (NestJS)
+```powershell
+cd backend
+npm install --legacy-peer-deps
+npm run start:dev
+```
+* **API activa en:** `http://localhost:3000`
+* **Swagger UI interactivo:** `http://localhost:3000/api/docs`
+
+### 2. Iniciar la Aplicación Móvil (React Native)
+```powershell
+cd mobile
+npm install --legacy-peer-deps
+npx expo start
+```
+* Presiona `a` para emulador de Android o escanea el código QR con Expo Go.

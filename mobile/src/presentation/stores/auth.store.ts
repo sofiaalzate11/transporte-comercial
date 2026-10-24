@@ -1,7 +1,9 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-import { UserRole } from '../../../../shared/types';
+import { UserRole } from '../../shared/types';
+
+import { API_BASE_URL } from '../../data/config/api.config';
 
 interface AuthState {
   token: string | null;
@@ -19,7 +21,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (documento: string, password: string) => {
     try {
-      const res = await axios.post('http://10.0.2.2:3000/auth/login', {
+      const res = await axios.post(`${API_BASE_URL}/auth/login`, {
         documento,
         password,
       });

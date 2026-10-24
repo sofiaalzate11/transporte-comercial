@@ -1,7 +1,7 @@
-# Informe Técnico: Puesta en Marcha del Backend y Base de Datos
+# Informe Técnico: Puesta en Marcha del Backend, Base de Datos y Distribución Git
 
 ## 1. Resumen de Operaciones Ejecutadas
-Durante esta sesión de trabajo se logró compilar, configurar y ejecutar de forma operativa el backend en **NestJS**, así como preparar las dependencias del cliente móvil en **React Native (Expo)** y aprovisionar la base de datos relacional sin necesidad de requerir virtualización por hardware (Docker).
+Durante esta sesión de trabajo se logró compilar, configurar y ejecutar de forma operativa el backend en **NestJS**, así como preparar las dependencias del cliente móvil en **React Native (Expo)**, aprovisionar la base de datos relacional sin necesidad de requerir virtualización por hardware (Docker) y distribuir las ramas de trabajo en GitHub preservando la autoría individual de los cuatro integrantes.
 
 ---
 
@@ -73,7 +73,23 @@ Durante esta sesión de trabajo se logró compilar, configurar y ejecutar de for
 
 ---
 
-## 6. Guía Rápida para Continuar el Desarrollo
+## 6. Distribución de Autoría y Ramas en GitHub
+
+Para evitar que todo el código quedara asignado a un solo usuario, los módulos se comprometieron en ramas independientes con sus respectivos autores registrados en GitHub:
+
+| Rama | Autor | Correo asociado | Contenido comprometido |
+| :--- | :--- | :--- | :--- |
+| **`Sofia`** | Sofia Alzate | `anasofiaalzate334@gmail.com` | Contratos compartidos (`shared/types`), especificaciones y documentación técnica. |
+| **`Carlos`** | Carlos | `osorioscarlos2141@gmail.com` | API NestJS completa, configuración TypeORM, endpoints Swagger y PostgreSQL. |
+| **`Isabella`** | ibetancurr | `betancurriosisabella@gmail.com` | Capa de dominio puro (`CalculateDelayUseCase`) y persistencia local SQLite. |
+| **`Duber`** | Dacher | `dubermonsa@gmail.com` | Vistas Expo Router v4, componentes UI, `mobile/package.json` y limpieza legacy. |
+
+* Las cuatro ramas fueron sincronizadas hacia `https://github.com/sofiaalzate11/transporte-comercial.git` mediante fast-forward limpio.
+* El repositorio local quedó conectado directamente al origen remoto.
+
+---
+
+## 7. Guía Rápida para Continuar el Desarrollo
 
 ### Para reiniciar el backend en cualquier momento:
 ```powershell
