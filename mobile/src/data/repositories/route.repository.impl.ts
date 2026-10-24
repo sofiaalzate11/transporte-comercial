@@ -3,7 +3,7 @@ import { RouteModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
 import { SQLiteDataSource } from '../datasources/sqlite.datasource';
 import { ApiDataSource } from '../datasources/api.datasource';
-import { IDelayEvaluationResult, ITelemetryPayload } from '../../../../shared/types';
+import { IDelayEvaluationResult, ITelemetryPayload } from '../../shared/types';
 import { CalculateDelayUseCase } from '../../domain/use-cases/calculate-delay.usecase';
 
 export class RouteRepositoryImpl implements IRouteRepository {
