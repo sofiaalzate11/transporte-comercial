@@ -1,4 +1,4 @@
-import { IncidentType, IncidentSeverity } from '../../../../shared/types';
+import { IncidentType, IncidentSeverity } from '../../shared/types';
 
 export interface IncidentModel {
   id: string;

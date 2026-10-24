@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 import axios from 'axios';
-import { UserRole } from '../../../../shared/types';
+import { UserRole } from '../../shared/types';
 
 interface AuthState {
   token: string | null;

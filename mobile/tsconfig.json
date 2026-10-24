@@ -9,6 +9,7 @@
         "./src/*"
       ],
       "@shared/*": [
+        "./src/shared/*",
         "../shared/*"
       ]
     }

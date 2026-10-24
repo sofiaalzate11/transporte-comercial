@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { IncidentSeverity } from '../../../../shared/types';
+import { IncidentSeverity } from '../../shared/types';
 
 interface Props {
   gravedad: IncidentSeverity;

@@ -1,6 +1,6 @@
 import { RouteModel } from '../entities/route.model';
 import { IncidentModel } from '../entities/incident.model';
-import { IDelayEvaluationResult, ITelemetryPayload } from '../../../../shared/types';
+import { IDelayEvaluationResult, ITelemetryPayload } from '../../shared/types';
 
 export interface IRouteRepository {
   getRoutes(): Promise<RouteModel[]>;

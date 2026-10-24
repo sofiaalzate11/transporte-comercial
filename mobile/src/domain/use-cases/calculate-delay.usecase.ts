@@ -1,6 +1,6 @@
 import { RouteModel } from '../entities/route.model';
 import { IncidentModel } from '../entities/incident.model';
-import { IDelayEvaluationResult } from '../../../../shared/types';
+import { IDelayEvaluationResult } from '../../shared/types';
 
 export class CalculateDelayUseCase {
   /**

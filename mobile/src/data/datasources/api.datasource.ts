@@ -2,7 +2,7 @@ import axios, { AxiosInstance } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { RouteModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
-import { IDelayEvaluationResult, ITelemetryPayload } from '../../../../shared/types';
+import { IDelayEvaluationResult, ITelemetryPayload } from '../../shared/types';
 
 export class ApiDataSource {
   private client: AxiosInstance;
