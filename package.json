@@ -1,15 +1,13 @@
 {
-  "name": "transporte-colombia",
+  "name": "transporte-colombia-front",
   "version": "1.0.0",
   "private": true,
-  "description": "Monorepo Transporte Colombia (NestJS + React Native Expo)",
+  "description": "Frontend Mobile Transporte Colombia (React Native Expo)",
   "scripts": {
-    "start": "npx concurrently -n \"BACKEND,MOBILE\" -c \"yellow,cyan\" \"npm run start:dev --prefix backend\" \"npm run start --prefix mobile -- --go\"",
-    "dev": "npx concurrently -n \"BACKEND,MOBILE\" -c \"yellow,cyan\" \"npm run start:dev --prefix backend\" \"npm run start --prefix mobile -- --go\"",
-    "tunnel": "npx concurrently -n \"BACKEND,MOBILE\" -c \"yellow,cyan\" \"npm run start:dev --prefix backend\" \"npm run start --prefix mobile -- --go --tunnel\"",
-    "lint": "npm run lint --prefix backend && npm run lint --prefix mobile",
-    "dev:windows": "powershell -ExecutionPolicy Bypass -File ./start-dev.ps1",
-    "backend": "npm run start:dev --prefix backend",
+    "start": "npm run start --prefix mobile -- --go",
+    "dev": "npm run start --prefix mobile -- --go",
+    "tunnel": "npm run start --prefix mobile -- --go --tunnel",
+    "lint": "npm run lint --prefix mobile",
     "mobile": "npm run start --prefix mobile"
   }
 }
