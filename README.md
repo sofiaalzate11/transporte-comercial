@@ -1,44 +1,29 @@
-# Sistema de Monitoreo Vial y Control de Retrasos (Transporte Colombia)
+# Sistema de Monitoreo Vial y Control de Retrasos - Frontend Mobile
 
-Sistema distribuido Offline-First para transporte de carga en corredores viales colombianos. Integra una API REST en NestJS con PostgreSQL/PostGIS y una aplicación móvil en React Native (Expo) con persistencia local SQLite y mapas MapLibre.
+Aplicación móvil Offline-First para transporte de carga en corredores viales colombianos. Desarrollada en React Native con Expo SDK 58, persistencia local SQLite y visualización interactiva de mapas viales.
 
 ---
 
-## 1. Estructura del Monorepo
-
-El repositorio organiza responsabilidades técnicas en cuatro áreas independientes:
+## 1. Estructura del Repositorio Frontend
 
 ```text
-transporte_colombia_rn/
-├── backend/                  # Servidor API REST en NestJS
-│   ├── src/
-│   │   ├── auth/             # Autenticación JWT y guards
-│   │   ├── users/            # Entidades y gestión de usuarios
-│   │   ├── routes/           # Rutas de transporte y tramos viales
-│   │   ├── road-incidents/   # Novedades INVIAS y eventos en carretera
-│   │   ├── telemetry/        # Ingesta masiva de coordenadas GPS
-│   │   ├── delay-engine/     # Algoritmo de cálculo de demoras (Haversine)
-│   │   ├── database/         # Configuración TypeORM y PostgreSQL
-│   │   └── main.ts           # Bootstrap y Swagger UI (/api/docs)
-│   └── package.json
-│
-├── mobile/                   # Aplicación móvil en React Native (Expo SDK 52)
-│   ├── app/                  # Enrutador basado en archivos (expo-router v4)
-│   │   ├── (auth)/login.tsx  # Pantalla de acceso
-│   │   └── (tabs)/           # Pestañas: Rutas y Mapa Vial
-│   ├── src/
-│   │   ├── domain/           # Capa 2: Reglas puras y casos de uso
-│   │   ├── data/             # Capa 3: Persistencia SQLite y cliente HTTP
-│   │   └── presentation/     # Capa 1: Tiendas Zustand y componentes UI
-│   └── package.json
-│
-├── shared/                   # Tipos TypeScript y contratos comunes
-│   └── types/index.ts        # Interfaces compartidas cliente-servidor
-│
-├── docs/                     # Especificaciones técnicas y guías de estudio
-├── docker-compose.yml        # PostgreSQL 16 con extensión PostGIS
-└── AGENTS.md                 # Directivas del proyecto y reglas de código
+transporte_colombia_front/
+├── app/                  # Enrutador basado en archivos (expo-router v58)
+│   ├── (auth)/login.tsx  # Pantalla de acceso
+│   └── (tabs)/           # Pestañas: Rutas y Mapa Vial
+├── src/
+│   ├── domain/           # Capa 2: Reglas puras y casos de uso
+│   ├── data/             # Capa 3: Persistencia SQLite y cliente HTTP
+│   ├── presentation/     # Capa 1: Tiendas Zustand y componentes UI
+│   └── shared/types/     # Tipos TypeScript y contratos
+├── docs/                 # Especificaciones técnicas y bitácoras
+├── app.json              # Configuración de Expo
+├── package.json          # Dependencias y scripts de Expo
+├── tsconfig.json         # Configuración de TypeScript y alias
+└── AGENTS.md             # Directivas del proyecto
 ```
+
+> **Nota:** El backend NestJS se gestiona de forma desacoplada en el repositorio `Transporte-Comercial-BACK`.
 
 ---
 
@@ -112,7 +97,7 @@ El trabajo técnico está distribuido en cuatro ramas para preservar la autoría
 
 ### 1. Iniciar el Backend (NestJS)
 ```powershell
-cd backend
+cd ../Transporte-Comercial-BACK
 npm install --legacy-peer-deps
 npm run start:dev
 ```
@@ -121,7 +106,6 @@ npm run start:dev
 
 ### 2. Iniciar la Aplicación Móvil (React Native)
 ```powershell
-cd mobile
 npm install --legacy-peer-deps
 npx expo start
 ```
