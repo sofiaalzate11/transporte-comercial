@@ -1,34 +1,16 @@
-import React, { useEffect } from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuthStore } from '../src/presentation/stores/auth.store';
+import React from 'react';
+import { Redirect } from 'expo-router';
+import { useAuth } from '../src/presentation/context/AuthContext';
+import { LoadingScreen } from '../src/presentation/components/ui/LoadingScreen';
 
 export default function IndexScreen() {
-  const router = useRouter();
-  const { token, isLoading } = useAuthStore();
+  const { usuario, cargando } = useAuth();
 
-  useEffect(() => {
-    if (!isLoading) {
-      if (token) {
-        router.replace('/(tabs)/rutas');
-      } else {
-        router.replace('/(auth)/login');
-      }
-    }
-  }, [isLoading, token]);
+  if (cargando) {
+    return <LoadingScreen mensaje="Cargando sesión..." />;
+  }
 
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#1e3a8a" />
-    </View>
+    <Redirect href={usuario ? '/(tabs)/rutas' : '/(auth)/login'} />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-  },
-});

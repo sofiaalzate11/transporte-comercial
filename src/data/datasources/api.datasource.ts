@@ -1,5 +1,4 @@
 import axios, { AxiosInstance } from 'axios';
-import * as SecureStore from 'expo-secure-store';
 import { RouteModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
 import { IDelayEvaluationResult, ITelemetryPayload } from '../../shared/types';
@@ -13,14 +12,6 @@ export class ApiDataSource {
     this.client = axios.create({
       baseURL,
       timeout: 10000,
-    });
-
-    this.client.interceptors.request.use(async (config) => {
-      const token = await SecureStore.getItemAsync('auth_token');
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-      return config;
     });
   }
 

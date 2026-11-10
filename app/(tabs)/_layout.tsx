@@ -1,16 +1,25 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { Text } from 'react-native';
+import { useAuth } from '../../src/presentation/context/AuthContext';
+import { LogoutButton } from '../../src/presentation/components/LogoutButton';
 
 export default function TabsLayout() {
+  const { usuario } = useAuth();
+
+  if (!usuario) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{
         headerStyle: { backgroundColor: '#1e3a8a' },
         headerTintColor: '#ffffff',
+        headerTitleStyle: { fontWeight: 'bold' },
+        headerRight: () => <LogoutButton />,
         tabBarActiveTintColor: '#1e3a8a',
         tabBarInactiveTintColor: '#64748b',
-        headerTitleStyle: { fontWeight: 'bold' },
       }}
     >
       <Tabs.Screen

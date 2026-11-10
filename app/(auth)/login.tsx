@@ -1,123 +1,194 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useAuthStore } from '../../src/presentation/stores/auth.store';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '../../src/presentation/context/AuthContext';
+import { AuthScreen } from '../../src/presentation/components/ui/AuthScreen';
+import { Button } from '../../src/presentation/components/ui/Button';
+import { Checkbox } from '../../src/presentation/components/ui/Checkbox';
+import { MessageBanner } from '../../src/presentation/components/ui/MessageBanner';
+import { TextField } from '../../src/presentation/components/ui/TextField';
+import {
+  validarContrasena,
+  validarCorreo,
+} from '../../src/shared/utils/auth.validation';
+
+type ErroresLogin = {
+  correo?: string;
+  contrasena?: string;
+};
 
 export default function LoginScreen() {
-  const [documento, setDocumento] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const login = useAuthStore((state) => state.login);
   const router = useRouter();
+  const { login } = useAuth();
+  const params = useLocalSearchParams<{ correo?: string; mensaje?: string }>();
+
+  const correoParam = Array.isArray(params.correo) ? params.correo[0] : params.correo;
+  const mensajeParam = Array.isArray(params.mensaje)
+    ? params.mensaje[0]
+    : params.mensaje;
+
+  const [correo, setCorreo] = useState(correoParam ?? '');
+  const [contrasena, setContrasena] = useState('');
+  const [recordarme, setRecordarme] = useState(false);
+  const [errores, setErrores] = useState<ErroresLogin>({});
+  const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
+  const [mensajeExito, setMensajeExito] = useState<string | null>(
+    mensajeParam ?? null,
+  );
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    if (correoParam) {
+      setCorreo(correoParam);
+    }
+  }, [correoParam]);
+
+  useEffect(() => {
+    if (mensajeParam) {
+      setMensajeExito(mensajeParam);
+    }
+  }, [mensajeParam]);
 
   const handleLogin = async () => {
-    if (!documento.trim() || !password.trim()) {
-      Alert.alert('Error', 'Ingrese documento y contraseña');
+    const nuevosErrores: ErroresLogin = {
+      correo: validarCorreo(correo) ?? undefined,
+      contrasena: contrasena ? undefined : 'Ingresa tu contraseña',
+    };
+
+    setErrores(nuevosErrores);
+    setErrorGeneral(null);
+    setMensajeExito(null);
+
+    if (nuevosErrores.correo || nuevosErrores.contrasena) {
       return;
     }
 
-    setIsSubmitting(true);
-    const success = await login(documento, password);
-    setIsSubmitting(false);
+    setEnviando(true);
+    const resultado = await login(correo.trim(), contrasena, recordarme);
+    setEnviando(false);
 
-    if (success) {
-      router.replace('/(tabs)/rutas');
-    } else {
-      Alert.alert('Acceso Denegado', 'Credenciales inválidas o servidor no disponible');
+    if (!resultado.ok) {
+      setErrorGeneral(resultado.error);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Transporte Colombia</Text>
-      <Text style={styles.subtitle}>Monitoreo Vial y Control de Retrasos</Text>
+    <AuthScreen
+      titulo="Transporte Colombia"
+      subtitulo="Monitoreo vial y control de retrasos"
+    >
+      {mensajeExito ? (
+        <MessageBanner mensaje={mensajeExito} tipo="exito" />
+      ) : null}
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Documento de Identidad</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ej: 1098765432"
-          keyboardType="numeric"
-          value={documento}
-          onChangeText={setDocumento}
-          autoCapitalize="none"
+      {errorGeneral ? (
+        <MessageBanner mensaje={errorGeneral} tipo="error" />
+      ) : null}
+
+      <TextField
+        label="Correo electrónico"
+        placeholder="correo@ejemplo.com"
+        value={correo}
+        onChangeText={(valor) => {
+          setCorreo(valor);
+          if (errores.correo) {
+            setErrores((previos) => ({ ...previos, correo: undefined }));
+          }
+        }}
+        error={errores.correo}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="emailAddress"
+        editable={!enviando}
+      />
+
+      <TextField
+        label="Contraseña"
+        placeholder="••••••••"
+        value={contrasena}
+        onChangeText={(valor) => {
+          setContrasena(valor);
+          if (errores.contrasena) {
+            setErrores((previos) => ({ ...previos, contrasena: undefined }));
+          }
+        }}
+        error={errores.contrasena}
+        esContrasena
+        autoCapitalize="none"
+        autoCorrect={false}
+        textContentType="password"
+        editable={!enviando}
+        onSubmitEditing={handleLogin}
+      />
+
+      <View style={styles.filaOpciones}>
+        <Checkbox
+          checked={recordarme}
+          onChange={setRecordarme}
+          label="Recordarme"
         />
-
-        <Text style={styles.label}>Contraseña</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={isSubmitting}>
-          {isSubmitting ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text style={styles.buttonText}>Iniciar Sesión</Text>
-          )}
+        <TouchableOpacity
+          onPress={() => router.push('/(auth)/recuperar')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.enlace}>¿Olvidaste tu contraseña?</Text>
         </TouchableOpacity>
       </View>
-    </View>
+
+      <Button
+        title="Iniciar sesión"
+        onPress={handleLogin}
+        cargando={enviando}
+        style={styles.botonPrincipal}
+      />
+
+      <View style={styles.pie}>
+        <Text style={styles.pieTexto}>¿No tienes cuenta?</Text>
+        <TouchableOpacity
+          onPress={() => router.push('/(auth)/registro')}
+          accessibilityRole="button"
+        >
+          <Text style={styles.enlacePie}>Crear cuenta</Text>
+        </TouchableOpacity>
+      </View>
+    </AuthScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#f8fafc',
+  filaOpciones: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 2,
+    marginBottom: 4,
+    flexWrap: 'wrap',
+    rowGap: 8,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#1e3a8a',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    marginBottom: 32,
-    marginTop: 4,
-  },
-  form: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  label: {
+  enlace: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#334155',
-    marginBottom: 6,
-    marginTop: 12,
+    color: '#1e3a8a',
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#cbd5e1',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 15,
-    backgroundColor: '#f8fafc',
+  botonPrincipal: {
+    marginTop: 20,
   },
-  button: {
-    backgroundColor: '#1e3a8a',
-    borderRadius: 8,
-    paddingVertical: 14,
+  pie: {
+    marginTop: 22,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 24,
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  pieTexto: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  enlacePie: {
+    fontSize: 13,
     fontWeight: 'bold',
+    color: '#1e3a8a',
   },
 });
