@@ -1,15 +1,29 @@
 import * as SQLite from 'expo-sqlite';
+import * as SecureStore from 'expo-secure-store';
 import { RouteModel, RouteSegmentModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
 
 export class SQLiteDataSource {
   private db: SQLite.SQLiteDatabase | null = null;
+  private readonly databases = new Map<string, Promise<SQLite.SQLiteDatabase>>();
 
   async init(): Promise<void> {
-    if (this.db) return;
-    this.db = await SQLite.openDatabaseAsync('transporte_colombia.db');
+    const rawUser = await SecureStore.getItemAsync('auth_user');
+    const userId = rawUser ? (JSON.parse(rawUser) as { id: string }).id : 'anonymous';
+    const name = `transporte_${userId.replace(/[^a-zA-Z0-9-]/g, '')}.db`;
+    let pending = this.databases.get(name);
+    if (!pending) {
+      pending = this.openDatabase(name);
+      this.databases.set(name, pending);
+      pending.catch(() => this.databases.delete(name));
+    }
+    this.db = await pending;
+  }
 
-    await this.db.execAsync(`
+  private async openDatabase(name: string): Promise<SQLite.SQLiteDatabase> {
+    const db = await SQLite.openDatabaseAsync(name);
+
+    await db.execAsync(`
       PRAGMA journal_mode = WAL;
 
       CREATE TABLE IF NOT EXISTS rutas (
@@ -71,6 +85,7 @@ export class SQLiteDataSource {
         sincronizado INTEGER DEFAULT 0
       );
     `);
+    return db;
   }
 
   async saveRoutes(routes: RouteModel[]): Promise<void> {
@@ -129,7 +144,7 @@ export class SQLiteDataSource {
     if (!this.db) return [];
 
     const rows: any[] = await this.db.getAllAsync('SELECT * FROM rutas ORDER BY eta_pactado ASC');
-    return rows.map((row) => ({
+    return Promise.all(rows.map(async (row) => ({
       id: row.id,
       usuarioId: row.usuario_id,
       codigoManifiesto: row.codigo_manifiesto,
@@ -144,7 +159,14 @@ export class SQLiteDataSource {
       distanciaTotalKm: row.distancia_total_km,
       tiempoEstimadoBaseMin: row.tiempo_estimado_base_min,
       estado: row.estado,
-    }));
+      tramos: (await this.db!.getAllAsync<any>('SELECT * FROM tramos WHERE ruta_id = ? ORDER BY orden_secuencia', [row.id])).map((segment): RouteSegmentModel => ({
+        id: segment.id, ordenSecuencia: segment.orden_secuencia,
+        origenLat: segment.origen_lat, origenLon: segment.origen_lon,
+        destinoLat: segment.destino_lat, destinoLon: segment.destino_lon,
+        viaCodigo: segment.via_codigo, distanciaKm: segment.distancia_km,
+        tiempoBaseMin: segment.tiempo_base_min,
+      })),
+    })));
   }
 
   async saveIncidents(incidents: IncidentModel[]): Promise<void> {
