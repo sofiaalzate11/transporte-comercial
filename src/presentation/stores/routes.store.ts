@@ -35,7 +35,15 @@ export const useRoutesStore = create<RoutesState>((set, get) => ({
         routeRepository.getRoutes(),
         routeRepository.getActiveIncidents(),
       ]);
-      set({ rutas, incidentes, cargando: false });
+      const seleccionadaActual = get().rutaSeleccionada;
+      const nuevaSeleccionada = seleccionadaActual
+        ? rutas.find((r) => r.id === seleccionadaActual.id) || rutas[0] || null
+        : rutas[0] || null;
+
+      set({ rutas, incidentes, rutaSeleccionada: nuevaSeleccionada, cargando: false });
+      if (nuevaSeleccionada) {
+        get().evaluarRetrasoRuta(nuevaSeleccionada.id);
+      }
     } catch {
       set({ cargando: false });
     }

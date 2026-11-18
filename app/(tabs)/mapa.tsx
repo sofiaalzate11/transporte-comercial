@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, ActivityIndicator, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { useRoutesStore } from '../../src/presentation/stores/routes.store';
 
@@ -128,18 +128,26 @@ export default function MapaScreen() {
 
   return (
     <View style={styles.container}>
-      <WebView
-        originWhitelist={['*']}
-        source={{ html: htmlContent }}
-        style={styles.map}
-        startInLoadingState={true}
-        renderLoading={() => (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#1e3a8a" />
-            <Text style={styles.loadingText}>Cargando OpenStreetMap...</Text>
-          </View>
-        )}
-      />
+      {Platform.OS === 'web' ? (
+        <iframe
+          title="OpenStreetMap"
+          srcDoc={htmlContent}
+          style={{ width: '100%', height: '100%', border: 'none' }}
+        />
+      ) : (
+        <WebView
+          originWhitelist={['*']}
+          source={{ html: htmlContent }}
+          style={styles.map}
+          startInLoadingState={true}
+          renderLoading={() => (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#1e3a8a" />
+              <Text style={styles.loadingText}>Cargando OpenStreetMap...</Text>
+            </View>
+          )}
+        />
+      )}
 
       {rutaSeleccionada && (
         <View style={styles.overlayBanner}>

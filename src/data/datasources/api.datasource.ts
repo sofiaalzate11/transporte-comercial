@@ -3,15 +3,23 @@ import { RouteModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
 import { IDelayEvaluationResult, ITelemetryPayload } from '../../shared/types';
 import { API_BASE_URL } from '../config/api.config';
+import { getSecureItem } from '../services/secure-storage.adapter';
 
 export class ApiDataSource {
   private client: AxiosInstance;
 
   constructor(baseURL: string = API_BASE_URL) {
-    // 10.0.2.2 apunta al localhost de la máquina anfitriona en el emulador de Android
     this.client = axios.create({
       baseURL,
       timeout: 10000,
+    });
+
+    this.client.interceptors.request.use(async (config) => {
+      const token = await getSecureItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
     });
   }
 
