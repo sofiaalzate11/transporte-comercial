@@ -10,6 +10,7 @@ interface Props {
   onUpdateStatus?: (routeId: string, nuevoEstado: string) => Promise<void>;
   currentUserId?: string;
   userRole?: string;
+  tieneViajeActivo?: boolean;
 }
 
 export const RouteCard: React.FC<Props> = ({
@@ -19,14 +20,19 @@ export const RouteCard: React.FC<Props> = ({
   onUpdateStatus,
   currentUserId,
   userRole,
+  tieneViajeActivo,
 }) => {
   const [actualizando, setActualizando] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
 
   const handleStatusChange = async (nuevoEstado: string) => {
     if (!onUpdateStatus) return;
+    setErrorMsg(null);
     setActualizando(true);
     try {
       await onUpdateStatus(route.id, nuevoEstado);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'Error al actualizar estado');
     } finally {
       setActualizando(false);
     }
@@ -34,6 +40,7 @@ export const RouteCard: React.FC<Props> = ({
 
   const isAssignedToMe = currentUserId && route.usuarioId === currentUserId;
   const canManageStatus = isAssignedToMe || userRole === 'operador';
+  const isTripInProgress = route.estado === 'en_ruta' || route.estado === 'en_suspension';
 
   const getStatusConfig = (estado: string) => {
     switch (estado) {
@@ -94,19 +101,20 @@ export const RouteCard: React.FC<Props> = ({
 
   return (
     <TouchableOpacity
-      style={[styles.card, isSelected && styles.selectedCard]}
+      style={[
+        styles.card,
+        isSelected && styles.selectedCard,
+        isTripInProgress && styles.cardActiveTrip,
+      ]}
       onPress={() => onPress(route)}
       activeOpacity={0.85}
     >
-      {/* Cabecera: Origen -> Destino y Badge de Estado */}
+      {/* Cabecera: Manifiesto y Badge de Estado */}
       <View style={styles.header}>
         <View style={{ flex: 1, marginRight: 8 }}>
           {route.codigoManifiesto ? (
             <Text style={styles.manifestText}>{route.codigoManifiesto}</Text>
           ) : null}
-          <Text style={styles.title}>
-            {route.origenNombre} → {route.destinoNombre}
-          </Text>
         </View>
 
         <View
@@ -127,6 +135,33 @@ export const RouteCard: React.FC<Props> = ({
         </View>
       </View>
 
+      {/* Diferenciación visual clara de Salida (Origen) vs Entrada (Destino) */}
+      <View style={styles.routePointsBox}>
+        <View style={styles.pointRow}>
+          <View style={[styles.pointBadge, styles.badgeSalida]}>
+            <Ionicons name="log-out-outline" size={13} color="#15803d" style={{ marginRight: 4 }} />
+            <Text style={styles.pointBadgeTextSalida}>SALIDA</Text>
+          </View>
+          <Text style={styles.pointName} numberOfLines={1}>
+            {route.origenNombre}
+          </Text>
+        </View>
+
+        <View style={styles.pointDivider}>
+          <Ionicons name="arrow-down" size={12} color="#94a3b8" />
+        </View>
+
+        <View style={styles.pointRow}>
+          <View style={[styles.pointBadge, styles.badgeEntrada]}>
+            <Ionicons name="log-in-outline" size={13} color="#1d4ed8" style={{ marginRight: 4 }} />
+            <Text style={styles.pointBadgeTextEntrada}>ENTRADA</Text>
+          </View>
+          <Text style={styles.pointName} numberOfLines={1}>
+            {route.destinoNombre}
+          </Text>
+        </View>
+      </View>
+
       {/* Info Conductor Asignado */}
       <View style={styles.driverRow}>
         <Ionicons name="person-circle-outline" size={16} color="#475569" style={{ marginRight: 4 }} />
@@ -134,7 +169,7 @@ export const RouteCard: React.FC<Props> = ({
         <Text style={styles.driverValue}>{driverName}</Text>
       </View>
 
-      {/* Detalles Métricas */}
+      {/* Métricas de Distancia, Tiempo y ETA */}
       <View style={styles.metricsRow}>
         <View style={styles.metricItem}>
           <Ionicons name="speedometer-outline" size={13} color="#64748b" style={{ marginRight: 3 }} />
@@ -156,6 +191,14 @@ export const RouteCard: React.FC<Props> = ({
         </View>
       </View>
 
+      {/* Mensaje de error si falla la acción */}
+      {errorMsg ? (
+        <View style={styles.errorBanner}>
+          <Ionicons name="alert-circle" size={14} color="#dc2626" style={{ marginRight: 4 }} />
+          <Text style={styles.errorText}>{errorMsg}</Text>
+        </View>
+      ) : null}
+
       {/* Botones de Acción para el Conductor u Operador */}
       {canManageStatus && (
         <View style={styles.actionContainer}>
@@ -164,13 +207,22 @@ export const RouteCard: React.FC<Props> = ({
           ) : (
             <>
               {route.estado === 'pendiente' && (
-                <TouchableOpacity
-                  style={[styles.btnAction, styles.btnAccept]}
-                  onPress={() => handleStatusChange('en_ruta')}
-                >
-                  <Ionicons name="paper-plane" size={14} color="#ffffff" style={{ marginRight: 4 }} />
-                  <Text style={styles.btnActionText}>Aceptar e Iniciar Viaje</Text>
-                </TouchableOpacity>
+                tieneViajeActivo && !isTripInProgress ? (
+                  <View style={styles.blockedBox}>
+                    <Ionicons name="lock-closed" size={13} color="#92400e" style={{ marginRight: 4 }} />
+                    <Text style={styles.blockedText}>
+                      Viaje en curso activo. Debe finalizar su entrega actual antes de tomar esta ruta.
+                    </Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.btnAction, styles.btnAccept]}
+                    onPress={() => handleStatusChange('en_ruta')}
+                  >
+                    <Ionicons name="paper-plane" size={14} color="#ffffff" style={{ marginRight: 4 }} />
+                    <Text style={styles.btnActionText}>Aceptar e Iniciar Viaje</Text>
+                  </TouchableOpacity>
+                )
               )}
 
               {route.estado === 'en_ruta' && (
@@ -234,28 +286,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
   },
-  selectedCard: {
+  cardActiveTrip: {
     borderColor: '#3b82f6',
-    borderWidth: 2,
+    borderWidth: 1.5,
     backgroundColor: '#f8fafc',
+  },
+  selectedCard: {
+    borderColor: '#1e3a8a',
+    borderWidth: 2,
+    backgroundColor: '#f1f5f9',
   },
   manifestText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#6366f1',
     letterSpacing: 0.5,
-    marginBottom: 2,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0f172a',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -270,10 +321,60 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
+  routePointsBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#edf2f7',
+  },
+  pointRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pointBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  badgeSalida: {
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  badgeEntrada: {
+    backgroundColor: '#dbeafe',
+    borderWidth: 1,
+    borderColor: '#93c5fd',
+  },
+  pointBadgeTextSalida: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  pointBadgeTextEntrada: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1d4ed8',
+  },
+  pointName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+    flex: 1,
+  },
+  pointDivider: {
+    paddingLeft: 24,
+    paddingVertical: 1,
+  },
   driverRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f1f5f9',
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 6,
@@ -293,7 +394,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-start',
     gap: 16,
-    paddingTop: 4,
+    paddingTop: 2,
   },
   metricItem: {
     flexDirection: 'row',
@@ -304,11 +405,41 @@ const styles = StyleSheet.create({
     color: '#475569',
     fontWeight: '600',
   },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  errorText: {
+    fontSize: 11,
+    color: '#b91c1c',
+    flex: 1,
+  },
   actionContainer: {
     marginTop: 10,
     paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
+  },
+  blockedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+    borderWidth: 1,
+    padding: 8,
+    borderRadius: 6,
+  },
+  blockedText: {
+    fontSize: 11,
+    color: '#92400e',
+    fontWeight: '600',
+    flex: 1,
   },
   btnGroup: {
     flexDirection: 'row',

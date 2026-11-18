@@ -107,7 +107,21 @@ export default function RutasScreen() {
   const esOperador = rolActual === 'operador';
   const esConductor = rolActual === 'conductor';
 
-  // Alerta para conductor: cuántas rutas pendientes tiene
+  // Viaje en curso activo del conductor (en_ruta o en_suspension)
+  const viajeActivoConductor = useMemo(() => {
+    if (!esConductor) return null;
+    return (
+      rutas.find(
+        (r) =>
+          (r.estado === 'en_ruta' || r.estado === 'en_suspension') &&
+          (!usuario?.id || r.usuarioId === usuario.id),
+      ) || null
+    );
+  }, [rutas, esConductor, usuario]);
+
+  const tieneViajeActivo = Boolean(viajeActivoConductor);
+
+  // Alerta para conductor: órdenes pendientes por aceptar
   const rutasPendientesConductor = useMemo(() => {
     if (!esConductor) return [];
     return rutas.filter(
@@ -204,16 +218,46 @@ export default function RutasScreen() {
         </View>
       </View>
 
-      {/* Alerta Destacada para el Conductor si tiene rutas pendientes de aceptar */}
+      {/* Banner de Viaje Activo en Curso para el Conductor */}
+      {esConductor && viajeActivoConductor && (
+        <View style={styles.activeTripBanner}>
+          <View style={styles.activeTripHeader}>
+            <Ionicons name="navigate-circle" size={18} color="#1d4ed8" style={{ marginRight: 6 }} />
+            <Text style={styles.activeTripTitle}>VIAJE EN CURSO ACTIVO</Text>
+            <View
+              style={[
+                styles.activeTripBadge,
+                viajeActivoConductor.estado === 'en_suspension'
+                  ? styles.badgeSuspended
+                  : styles.badgeEnRuta,
+              ]}
+            >
+              <Text style={styles.activeTripBadgeText}>
+                {viajeActivoConductor.estado === 'en_suspension' ? 'EN SUSPENSIÓN' : 'EN RUTA'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.activeTripRoute}>
+            Salida: {viajeActivoConductor.origenNombre} → Entrada: {viajeActivoConductor.destinoNombre}
+          </Text>
+          <Text style={styles.activeTripNote}>
+            Debe finalizar la entrega de este viaje antes de aceptar o iniciar una nueva orden.
+          </Text>
+        </View>
+      )}
+
+      {/* Alerta de Órdenes Pendientes para el Conductor */}
       {esConductor && rutasPendientesConductor.length > 0 && (
         <View style={styles.conductorAlertCard}>
           <Ionicons name="notifications-circle" size={24} color="#b45309" style={{ marginRight: 8 }} />
           <View style={{ flex: 1 }}>
             <Text style={styles.conductorAlertTitle}>
-              Tiene {rutasPendientesConductor.length} orden(es) pendiente(s) de confirmación
+              Tiene {rutasPendientesConductor.length} orden(es) pendiente(s) por tomar
             </Text>
             <Text style={styles.conductorAlertSub}>
-              Revise los detalles y pulse &quot;Aceptar e Iniciar Viaje&quot; para iniciar el recorrido.
+              {tieneViajeActivo
+                ? 'Finalice su viaje activo para habilitar el inicio de la siguiente ruta.'
+                : 'Pulse "Aceptar e Iniciar Viaje" en la tarjeta para comenzar el recorrido.'}
             </Text>
           </View>
         </View>
@@ -261,7 +305,7 @@ export default function RutasScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Alerta de Retraso de la Ruta Seleccionada */}
+      {/* Alerta de Retraso por Incidentes Viales (Icono de Triángulo de Advertencia Distintivo) */}
       {evaluacionRetraso && (
         <View
           style={[
@@ -269,13 +313,21 @@ export default function RutasScreen() {
             evaluacionRetraso.isDelayed ? styles.alertDelayed : styles.alertOk,
           ]}
         >
-          <Text style={styles.alertTitle}>
-            {evaluacionRetraso.isDelayed
-              ? `ALERTA DE RETRASO: +${evaluacionRetraso.deltaMinutes} min`
-              : 'TIEMPO ESTIMADO EN CRONOGRAMA'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+            <Ionicons
+              name={evaluacionRetraso.isDelayed ? 'warning' : 'checkmark-circle'}
+              size={18}
+              color={evaluacionRetraso.isDelayed ? '#dc2626' : '#15803d'}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.alertTitle}>
+              {evaluacionRetraso.isDelayed
+                ? `INCIDENTES VIALES: +${evaluacionRetraso.deltaMinutes} min DE RETRASO`
+                : 'TIEMPO ESTIMADO EN CRONOGRAMA'}
+            </Text>
+          </View>
           <Text style={styles.alertSub}>
-            Incidentes en ruta: {evaluacionRetraso.affectingIncidentsCount} | ETA:{' '}
+            Afectaciones activas en ruta: {evaluacionRetraso.affectingIncidentsCount} | ETA:{' '}
             {new Date(evaluacionRetraso.recalculatedEta).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
@@ -283,7 +335,7 @@ export default function RutasScreen() {
           </Text>
           <TouchableOpacity style={styles.mapButton} onPress={handleOpenMap}>
             <Ionicons name="map-outline" size={14} color="#ffffff" style={{ marginRight: 4 }} />
-            <Text style={styles.mapButtonText}>Ver en Mapa</Text>
+            <Text style={styles.mapButtonText}>Ver Mapa Vial</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -300,6 +352,7 @@ export default function RutasScreen() {
             onUpdateStatus={handleUpdateStatus}
             currentUserId={usuario?.id}
             userRole={rolActual}
+            tieneViajeActivo={tieneViajeActivo}
           />
         )}
         refreshControl={
@@ -345,20 +398,22 @@ export default function RutasScreen() {
             </View>
 
             <ScrollView style={{ maxHeight: 420 }}>
-              {/* Sección 1: Selector de Conductor */}
+              {/* Sección 1: Selector de Conductor con Estado de Disponibilidad */}
               <Text style={styles.modalSectionLabel}>1. Asignar al Conductor:</Text>
               {conductores.length === 0 ? (
                 <Text style={styles.noDriversText}>Cargando conductores disponibles...</Text>
               ) : (
                 <View style={styles.driverListContainer}>
-                  {conductores.map((c) => {
+                  {conductores.map((c: any) => {
                     const isSelected = conductorSeleccionadoId === c.id;
+                    const tieneActivo = Boolean(c.viajeActivo);
                     return (
                       <TouchableOpacity
                         key={c.id}
                         style={[
                           styles.driverOptionChip,
                           isSelected && styles.driverOptionChipSelected,
+                          tieneActivo && styles.driverOptionChipBusy,
                         ]}
                         onPress={() => setConductorSeleccionadoId(c.id)}
                       >
@@ -369,15 +424,31 @@ export default function RutasScreen() {
                           style={{ marginRight: 6 }}
                         />
                         <View style={{ flex: 1 }}>
-                          <Text
-                            style={[
-                              styles.driverOptionName,
-                              isSelected && styles.driverOptionNameSelected,
-                            ]}
-                          >
-                            {c.nombre}
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <Text
+                              style={[
+                                styles.driverOptionName,
+                                isSelected && styles.driverOptionNameSelected,
+                              ]}
+                            >
+                              {c.nombre}
+                            </Text>
+                            {tieneActivo ? (
+                              <View style={styles.driverBusyBadge}>
+                                <Text style={styles.driverBusyBadgeText}>En Viaje Activo</Text>
+                              </View>
+                            ) : (
+                              <View style={styles.driverFreeBadge}>
+                                <Text style={styles.driverFreeBadgeText}>Disponible</Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={styles.driverOptionDoc}>
+                            {c.documento}
+                            {tieneActivo
+                              ? ` · (${c.viajeActivo.origen} → ${c.viajeActivo.destino})`
+                              : ''}
                           </Text>
-                          <Text style={styles.driverOptionDoc}>{c.documento}</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -397,9 +468,11 @@ export default function RutasScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.presetManifiesto}>{preset.codigoManifiesto}</Text>
-                    <Text style={styles.presetRoute}>
-                      {preset.origenNombre} → {preset.destinoNombre}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <Text style={styles.presetPointSalida}>Salida: {preset.origenNombre}</Text>
+                      <Text style={{ marginHorizontal: 4, color: '#94a3b8' }}>→</Text>
+                      <Text style={styles.presetPointEntrada}>Entrada: {preset.destinoNombre}</Text>
+                    </View>
                     <Text style={styles.presetInfo}>
                       {preset.distanciaTotalKm} km · {preset.tiempoEstimadoBaseMin / 60} horas estimadas
                     </Text>
@@ -506,6 +579,53 @@ const styles = StyleSheet.create({
     color: '#16a34a',
     fontWeight: '600',
   },
+  activeTripBanner: {
+    backgroundColor: '#eff6ff',
+    borderWidth: 1.5,
+    borderColor: '#93c5fd',
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 12,
+  },
+  activeTripHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  activeTripTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#1d4ed8',
+    letterSpacing: 0.5,
+    flex: 1,
+  },
+  activeTripBadge: {
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+  },
+  badgeEnRuta: {
+    backgroundColor: '#dbeafe',
+  },
+  badgeSuspended: {
+    backgroundColor: '#ffedd5',
+  },
+  activeTripBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#1e3a8a',
+  },
+  activeTripRoute: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  activeTripNote: {
+    fontSize: 11,
+    color: '#475569',
+  },
   conductorAlertCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -608,9 +728,10 @@ const styles = StyleSheet.create({
     borderColor: '#10b981',
   },
   alertTitle: {
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '800',
     color: '#1f2937',
+    letterSpacing: 0.3,
   },
   alertSub: {
     fontSize: 11,
@@ -722,6 +843,10 @@ const styles = StyleSheet.create({
     borderColor: '#3b82f6',
     backgroundColor: '#eff6ff',
   },
+  driverOptionChipBusy: {
+    borderColor: '#fed7aa',
+    backgroundColor: '#fffbeb',
+  },
   driverOptionName: {
     fontSize: 13,
     fontWeight: '600',
@@ -734,6 +859,33 @@ const styles = StyleSheet.create({
   driverOptionDoc: {
     fontSize: 11,
     color: '#64748b',
+    marginTop: 2,
+  },
+  driverBusyBadge: {
+    backgroundColor: '#ffedd5',
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#fdba74',
+  },
+  driverBusyBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#c2410c',
+  },
+  driverFreeBadge: {
+    backgroundColor: '#dcfce7',
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  driverFreeBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#15803d',
   },
   presetItem: {
     flexDirection: 'row',
@@ -750,11 +902,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2563eb',
   },
-  presetRoute: {
-    fontSize: 14,
+  presetPointSalida: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#1e293b',
-    marginTop: 2,
+    color: '#15803d',
+  },
+  presetPointEntrada: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1d4ed8',
   },
   presetInfo: {
     fontSize: 11,
