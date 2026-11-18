@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/presentation/context/AuthContext';
@@ -16,6 +17,95 @@ import { useRoutesStore } from '../../src/presentation/stores/routes.store';
 import { RouteCard } from '../../src/presentation/components/RouteCard';
 import { RouteModel } from '../../src/domain/entities/route.model';
 import { useRouter } from 'expo-router';
+
+const LOGISTIC_NODES: Record<string, { lat: number; lon: number }> = {
+  bogota: { lat: 4.711, lon: -74.0721 },
+  medellin: { lat: 6.2442, lon: -75.5812 },
+  cali: { lat: 3.4516, lon: -76.532 },
+  barranquilla: { lat: 10.9685, lon: -74.7813 },
+  cartagena: { lat: 10.391, lon: -75.4794 },
+  bucaramanga: { lat: 7.1254, lon: -73.1198 },
+  pereira: { lat: 4.8133, lon: -75.6961 },
+  manizales: { lat: 5.0689, lon: -75.5174 },
+  ibague: { lat: 4.4389, lon: -75.2322 },
+  cucuta: { lat: 7.8939, lon: -72.5078 },
+  'santa marta': { lat: 11.2408, lon: -74.199 },
+  buenaventura: { lat: 3.8801, lon: -77.0312 },
+  pasto: { lat: 1.2136, lon: -77.2811 },
+  villavicencio: { lat: 4.142, lon: -73.6266 },
+  neiva: { lat: 2.9273, lon: -75.2819 },
+  armenia: { lat: 4.5339, lon: -75.6811 },
+  girardot: { lat: 4.3014, lon: -74.8061 },
+  tunja: { lat: 5.5353, lon: -73.3678 },
+};
+
+async function geocodeLocation(query: string): Promise<{ lat: number; lon: number; nombre: string }> {
+  const clean = query.trim();
+  const normalized = clean.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  for (const [key, coords] of Object.entries(LOGISTIC_NODES)) {
+    if (normalized.includes(key)) {
+      return { lat: coords.lat, lon: coords.lon, nombre: clean };
+    }
+  }
+
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=co&limit=1&q=${encodeURIComponent(
+        clean,
+      )}`,
+    );
+    const data = await res.json();
+    if (data && data.length > 0) {
+      return {
+        lat: parseFloat(data[0].lat),
+        lon: parseFloat(data[0].lon),
+        nombre: clean,
+      };
+    }
+  } catch (e) {
+    console.warn('Error en geocodificación:', e);
+  }
+
+  return { lat: 4.711, lon: -74.0721, nombre: clean };
+}
+
+async function calculateRoadMetrics(
+  origenLat: number,
+  origenLon: number,
+  destinoLat: number,
+  destinoLon: number,
+): Promise<{ distanciaKm: number; tiempoBaseMin: number }> {
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origenLon},${origenLat};${destinoLon},${destinoLat}?overview=false`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.routes && data.routes.length > 0) {
+      const distanceMeters = data.routes[0].distance;
+      const durationSeconds = data.routes[0].duration;
+      return {
+        distanciaKm: Math.round((distanceMeters / 1000) * 10) / 10,
+        tiempoBaseMin: Math.round(durationSeconds / 60),
+      };
+    }
+  } catch (e) {
+    console.warn('Error en cálculo OSRM:', e);
+  }
+
+  const dLat = (destinoLat - origenLat) * (Math.PI / 180);
+  const dLon = (destinoLon - origenLon) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(origenLat * (Math.PI / 180)) *
+      Math.cos(destinoLat * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const kmDirecto = 6371 * c;
+  const kmCarretera = Math.round(kmDirecto * 1.35 * 10) / 10;
+  const minEstimados = Math.round((kmCarretera / 45) * 60);
+  return { distanciaKm: kmCarretera, tiempoBaseMin: minEstimados };
+}
 
 const PRESET_FIXED_ROUTES = [
   {
@@ -85,12 +175,18 @@ export default function RutasScreen() {
   const [creando, setCreando] = useState(false);
   const [conductorSeleccionadoId, setConductorSeleccionadoId] = useState<string>('');
 
+  // Pestaña del modal: 'preset' o 'personalizado'
+  const [tipoDespacho, setTipoDespacho] = useState<'preset' | 'personalizado'>('preset');
+  const [origenInput, setOrigenInput] = useState('');
+  const [destinoInput, setDestinoInput] = useState('');
+  const [manifiestoInput, setManifiestoInput] = useState('');
+  const [errorDespacho, setErrorDespacho] = useState<string | null>(null);
+
   useEffect(() => {
     cargarDatos();
     cargarConductores();
   }, []);
 
-  // Seleccionar por defecto el primer conductor cuando la lista esté lista
   useEffect(() => {
     if (conductores.length > 0 && !conductorSeleccionadoId) {
       setConductorSeleccionadoId(conductores[0].id);
@@ -107,7 +203,7 @@ export default function RutasScreen() {
   const esOperador = rolActual === 'operador';
   const esConductor = rolActual === 'conductor';
 
-  // Viaje en curso activo del conductor (en_ruta o en_suspension)
+  // Viaje en curso activo del conductor
   const viajeActivoConductor = useMemo(() => {
     if (!esConductor) return null;
     return (
@@ -143,6 +239,7 @@ export default function RutasScreen() {
     setActualizando(false);
   };
 
+  // Despacho de Preset Fijo
   const handleDispatchPreset = async (preset: typeof PRESET_FIXED_ROUTES[0]) => {
     setCreando(true);
     const etaPactado = new Date(Date.now() + preset.tiempoEstimadoBaseMin * 60000).toISOString();
@@ -154,6 +251,53 @@ export default function RutasScreen() {
     });
     setCreando(false);
     setModalVisible(false);
+  };
+
+  // Despacho de Ruta Personalizada con Cálculo Automático OSRM
+  const handleCustomDispatch = async () => {
+    if (!origenInput.trim() || !destinoInput.trim()) {
+      setErrorDespacho('Ingrese la dirección o ciudad de salida y de entrada.');
+      return;
+    }
+    setErrorDespacho(null);
+    setCreando(true);
+    try {
+      const origenCoords = await geocodeLocation(origenInput);
+      const destinoCoords = await geocodeLocation(destinoInput);
+      const metrics = await calculateRoadMetrics(
+        origenCoords.lat,
+        origenCoords.lon,
+        destinoCoords.lat,
+        destinoCoords.lon,
+      );
+
+      const etaPactado = new Date(Date.now() + metrics.tiempoBaseMin * 60000).toISOString();
+      const codigo = manifiestoInput.trim() || `MAN-${Date.now().toString().slice(-6)}`;
+
+      await crearRuta({
+        codigoManifiesto: codigo,
+        origenNombre: origenCoords.nombre,
+        origenLat: origenCoords.lat,
+        origenLon: origenCoords.lon,
+        destinoNombre: destinoCoords.nombre,
+        destinoLat: destinoCoords.lat,
+        destinoLon: destinoCoords.lon,
+        distanciaTotalKm: metrics.distanciaKm,
+        tiempoEstimadoBaseMin: metrics.tiempoBaseMin,
+        conductorId: conductorSeleccionadoId || undefined,
+        etaPactado,
+        estado: 'pendiente',
+      });
+
+      setOrigenInput('');
+      setDestinoInput('');
+      setManifiestoInput('');
+      setModalVisible(false);
+    } catch (e: any) {
+      setErrorDespacho(e?.message || 'Error al calcular y despachar la ruta.');
+    } finally {
+      setCreando(false);
+    }
   };
 
   const handleUpdateStatus = async (routeId: string, nuevoEstado: string) => {
@@ -269,7 +413,7 @@ export default function RutasScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.operatorTitle}>Panel de Despacho (Operador)</Text>
             <Text style={styles.operatorSubtitle}>
-              Cree rutas fijas y asígnelas al conductor seleccionado
+              Cree rutas por dirección o catálogo y asígnelas al conductor
             </Text>
           </View>
           <TouchableOpacity
@@ -305,7 +449,7 @@ export default function RutasScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Alerta de Retraso por Incidentes Viales (Icono de Triángulo de Advertencia Distintivo) */}
+      {/* Alerta de Retraso por Incidentes Viales */}
       {evaluacionRetraso && (
         <View
           style={[
@@ -378,7 +522,7 @@ export default function RutasScreen() {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Modal para Crear y Despachar Rutas Fijas (Solo Operador) */}
+      {/* Modal para Crear y Despachar Rutas (Solo Operador) */}
       <Modal
         visible={modalVisible}
         transparent
@@ -390,16 +534,16 @@ export default function RutasScreen() {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Ionicons name="shield-checkmark" size={20} color="#1e3a8a" style={{ marginRight: 6 }} />
-                <Text style={styles.modalTitle}>Despacho de Ruta Fija</Text>
+                <Text style={styles.modalTitle}>Despacho de Ruta de Carga</Text>
               </View>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 420 }}>
-              {/* Sección 1: Selector de Conductor con Estado de Disponibilidad */}
-              <Text style={styles.modalSectionLabel}>1. Asignar al Conductor:</Text>
+            <ScrollView style={{ maxHeight: 460 }}>
+              {/* Sección 1: Selector de Conductor */}
+              <Text style={styles.modalSectionLabel}>1. Seleccionar Conductor Asignado:</Text>
               {conductores.length === 0 ? (
                 <Text style={styles.noDriversText}>Cargando conductores disponibles...</Text>
               ) : (
@@ -456,32 +600,119 @@ export default function RutasScreen() {
                 </View>
               )}
 
-              {/* Sección 2: Seleccionar Corredor Troncal */}
-              <Text style={styles.modalSectionLabel}>2. Seleccione el Corredor Troncal:</Text>
-              {PRESET_FIXED_ROUTES.map((preset, index) => (
+              {/* Selector de Modo de Despacho */}
+              <Text style={styles.modalSectionLabel}>2. Definición del Recorrido:</Text>
+              <View style={styles.modeTabs}>
                 <TouchableOpacity
-                  key={index}
-                  style={styles.presetItem}
-                  onPress={() => handleDispatchPreset(preset)}
-                  disabled={creando}
-                  activeOpacity={0.7}
+                  style={[styles.modeTab, tipoDespacho === 'preset' && styles.modeTabActive]}
+                  onPress={() => setTipoDespacho('preset')}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.presetManifiesto}>{preset.codigoManifiesto}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
-                      <Text style={styles.presetPointSalida}>Salida: {preset.origenNombre}</Text>
-                      <Text style={{ marginHorizontal: 4, color: '#94a3b8' }}>→</Text>
-                      <Text style={styles.presetPointEntrada}>Entrada: {preset.destinoNombre}</Text>
-                    </View>
-                    <Text style={styles.presetInfo}>
-                      {preset.distanciaTotalKm} km · {preset.tiempoEstimadoBaseMin / 60} horas estimadas
-                    </Text>
-                  </View>
-                  <Ionicons name="arrow-forward-circle" size={24} color="#1e3a8a" />
+                  <Ionicons
+                    name="list-outline"
+                    size={14}
+                    color={tipoDespacho === 'preset' ? '#1e3a8a' : '#64748b'}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.modeTabText, tipoDespacho === 'preset' && styles.modeTabTextActive]}>
+                    Corredores Fijos
+                  </Text>
                 </TouchableOpacity>
-              ))}
 
-              {creando && (
+                <TouchableOpacity
+                  style={[styles.modeTab, tipoDespacho === 'personalizado' && styles.modeTabActive]}
+                  onPress={() => setTipoDespacho('personalizado')}
+                >
+                  <Ionicons
+                    name="location-outline"
+                    size={14}
+                    color={tipoDespacho === 'personalizado' ? '#1e3a8a' : '#64748b'}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={[styles.modeTabText, tipoDespacho === 'personalizado' && styles.modeTabTextActive]}>
+                    Dirección / Ciudad Libre
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Modo 1: Corredores Frecuentes */}
+              {tipoDespacho === 'preset' ? (
+                PRESET_FIXED_ROUTES.map((preset, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.presetItem}
+                    onPress={() => handleDispatchPreset(preset)}
+                    disabled={creando}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.presetManifiesto}>{preset.codigoManifiesto}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                        <Text style={styles.presetPointSalida}>Salida: {preset.origenNombre}</Text>
+                        <Text style={{ marginHorizontal: 4, color: '#94a3b8' }}>→</Text>
+                        <Text style={styles.presetPointEntrada}>Entrada: {preset.destinoNombre}</Text>
+                      </View>
+                      <Text style={styles.presetInfo}>
+                        {preset.distanciaTotalKm} km · {preset.tiempoEstimadoBaseMin / 60} horas estimadas
+                      </Text>
+                    </View>
+                    <Ionicons name="arrow-forward-circle" size={24} color="#1e3a8a" />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                /* Modo 2: Formulario de Dirección / Ciudad Libre con Trazado OSRM */
+                <View style={styles.customFormBox}>
+                  <Text style={styles.inputLabel}>Punto de Salida (Dirección o Ciudad Origen):</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Ej: Bogotá (Zona Franca Fontibón) o Tunja"
+                    placeholderTextColor="#94a3b8"
+                    value={origenInput}
+                    onChangeText={setOrigenInput}
+                  />
+
+                  <Text style={styles.inputLabel}>Punto de Entrada (Dirección o Ciudad Destino):</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Ej: Cartagena (Sociedad Portuaria) o Neiva"
+                    placeholderTextColor="#94a3b8"
+                    value={destinoInput}
+                    onChangeText={setDestinoInput}
+                  />
+
+                  <Text style={styles.inputLabel}>Código de Manifiesto / Remesa (Opcional):</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Ej: MAN-2026-BOG-CTG"
+                    placeholderTextColor="#94a3b8"
+                    value={manifiestoInput}
+                    onChangeText={setManifiestoInput}
+                  />
+
+                  {errorDespacho && (
+                    <View style={styles.errorBox}>
+                      <Ionicons name="alert-circle" size={14} color="#b91c1c" style={{ marginRight: 4 }} />
+                      <Text style={styles.errorTextModal}>{errorDespacho}</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.btnCalculateAndDispatch}
+                    onPress={handleCustomDispatch}
+                    disabled={creando}
+                  >
+                    {creando ? (
+                      <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 6 }} />
+                    ) : (
+                      <Ionicons name="calculator-outline" size={16} color="#ffffff" style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={styles.btnCalculateText}>
+                      {creando ? 'Calculando y Despachando...' : 'Calcular Ruta y Despachar'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {creando && tipoDespacho === 'preset' && (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator color="#1e3a8a" />
                   <Text style={{ marginLeft: 8, color: '#1e3a8a', fontWeight: '500' }}>
@@ -798,7 +1029,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 18,
     width: '100%',
-    maxWidth: 520,
+    maxWidth: 540,
     elevation: 5,
   },
   modalHeader: {
@@ -887,6 +1118,37 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#15803d',
   },
+  modeTabs: {
+    flexDirection: 'row',
+    marginBottom: 10,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 3,
+  },
+  modeTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  modeTabActive: {
+    backgroundColor: '#ffffff',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  modeTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748b',
+  },
+  modeTabTextActive: {
+    color: '#1e3a8a',
+    fontWeight: '700',
+  },
   presetItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -916,6 +1178,54 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     marginTop: 2,
+  },
+  customFormBox: {
+    padding: 6,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
+    marginBottom: 4,
+    marginTop: 6,
+  },
+  textInput: {
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: '#0f172a',
+  },
+  btnCalculateAndDispatch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1e3a8a',
+    paddingVertical: 10,
+    borderRadius: 6,
+    marginTop: 14,
+  },
+  btnCalculateText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fca5a5',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  errorTextModal: {
+    fontSize: 11,
+    color: '#b91c1c',
   },
   loadingBox: {
     flexDirection: 'row',
