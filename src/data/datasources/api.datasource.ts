@@ -47,4 +47,14 @@ export class ApiDataSource {
     const response = await this.client.post<RouteModel>('/routes', dto);
     return response.data;
   }
+
+  async fetchDrivers(): Promise<Array<{ id: string; nombre: string; documento: string; rol: string }>> {
+    const response = await this.client.get<Array<{ id: string; nombre: string; documento: string; rol: string }>>('/users/drivers');
+    return response.data;
+  }
+
+  async updateRouteStatus(routeId: string, estado: string): Promise<RouteModel> {
+    const response = await this.client.patch<RouteModel>(`/routes/${routeId}/status`, { estado });
+    return response.data;
+  }
 }

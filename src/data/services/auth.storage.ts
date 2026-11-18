@@ -69,7 +69,13 @@ export async function obtenerUsuarioPorId(id: string): Promise<AuthUser | null> 
     const raw = await getSecureItem(USER_KEY);
     if (!raw) return null;
     const user = JSON.parse(raw) as AuthUser;
-    return user.id === id ? user : null;
+    if (user.id !== id) return null;
+    if (!user.rol) {
+      if (user.correo?.includes('operador')) user.rol = 'operador';
+      else if (user.correo?.includes('cliente')) user.rol = 'consulta';
+      else user.rol = 'conductor';
+    }
+    return user;
   }
 }
 

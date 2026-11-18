@@ -1,4 +1,6 @@
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSecureItem } from '../services/secure-storage.adapter';
 import { RouteModel, RouteSegmentModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
@@ -6,8 +8,20 @@ import { IncidentModel } from '../../domain/entities/incident.model';
 export class SQLiteDataSource {
   private db: SQLite.SQLiteDatabase | null = null;
   private readonly databases = new Map<string, Promise<SQLite.SQLiteDatabase>>();
+  private webRoutes: RouteModel[] = [];
+  private webIncidents: IncidentModel[] = [];
 
   async init(): Promise<void> {
+    if (Platform.OS === 'web') {
+      try {
+        const cached = await AsyncStorage.getItem('@web_routes');
+        if (cached) this.webRoutes = JSON.parse(cached);
+        const cachedInc = await AsyncStorage.getItem('@web_incidents');
+        if (cachedInc) this.webIncidents = JSON.parse(cachedInc);
+      } catch {}
+      return;
+    }
+
     const rawUser = await getSecureItem('auth_user');
     const userId = rawUser ? (JSON.parse(rawUser) as { id: string }).id : 'anonymous';
     const name = `transporte_${userId.replace(/[^a-zA-Z0-9-]/g, '')}.db`;
@@ -89,6 +103,12 @@ export class SQLiteDataSource {
   }
 
   async saveRoutes(routes: RouteModel[]): Promise<void> {
+    if (Platform.OS === 'web') {
+      this.webRoutes = routes;
+      await AsyncStorage.setItem('@web_routes', JSON.stringify(routes)).catch(() => {});
+      return;
+    }
+
     await this.init();
     if (!this.db) return;
 
@@ -140,6 +160,16 @@ export class SQLiteDataSource {
   }
 
   async getRoutes(): Promise<RouteModel[]> {
+    if (Platform.OS === 'web') {
+      if (this.webRoutes.length === 0) {
+        try {
+          const cached = await AsyncStorage.getItem('@web_routes');
+          if (cached) this.webRoutes = JSON.parse(cached);
+        } catch {}
+      }
+      return this.webRoutes;
+    }
+
     await this.init();
     if (!this.db) return [];
 
@@ -170,6 +200,12 @@ export class SQLiteDataSource {
   }
 
   async saveIncidents(incidents: IncidentModel[]): Promise<void> {
+    if (Platform.OS === 'web') {
+      this.webIncidents = incidents;
+      await AsyncStorage.setItem('@web_incidents', JSON.stringify(incidents)).catch(() => {});
+      return;
+    }
+
     await this.init();
     if (!this.db) return;
 
@@ -198,6 +234,16 @@ export class SQLiteDataSource {
   }
 
   async getActiveIncidents(): Promise<IncidentModel[]> {
+    if (Platform.OS === 'web') {
+      if (this.webIncidents.length === 0) {
+        try {
+          const cached = await AsyncStorage.getItem('@web_incidents');
+          if (cached) this.webIncidents = JSON.parse(cached);
+        } catch {}
+      }
+      return this.webIncidents;
+    }
+
     await this.init();
     if (!this.db) return [];
 

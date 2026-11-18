@@ -77,4 +77,14 @@ export class RouteRepositoryImpl implements IRouteRepository {
     await this.sqliteDs.saveRoutes([route]);
     return route;
   }
+
+  async updateRouteStatus(routeId: string, estado: string): Promise<RouteModel> {
+    const updated = await this.apiDs.updateRouteStatus(routeId, estado);
+    await this.sqliteDs.saveRoutes([updated]);
+    return updated;
+  }
+
+  async getDrivers(): Promise<Array<{ id: string; nombre: string; documento: string; rol: string }>> {
+    return this.apiDs.fetchDrivers();
+  }
 }

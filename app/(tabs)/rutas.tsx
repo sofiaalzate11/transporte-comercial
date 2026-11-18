@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,20 @@ import {
   TouchableOpacity,
   Modal,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/presentation/context/AuthContext';
 import { useRoutesStore } from '../../src/presentation/stores/routes.store';
 import { RouteCard } from '../../src/presentation/components/RouteCard';
+import { RouteModel } from '../../src/domain/entities/route.model';
 import { useRouter } from 'expo-router';
 
 const PRESET_FIXED_ROUTES = [
   {
     codigoManifiesto: 'MAN-40-BOG-GIR',
     origenNombre: 'Bogotá (Terminal Carga)',
-    origenLat: 4.7110,
+    origenLat: 4.711,
     origenLon: -74.0721,
     destinoNombre: 'Girardot (Centro Logístico)',
     destinoLat: 4.3014,
@@ -42,7 +44,7 @@ const PRESET_FIXED_ROUTES = [
     codigoManifiesto: 'MAN-40-CAL-BUE',
     origenNombre: 'Cali (Zona Franca)',
     origenLat: 3.4516,
-    origenLon: -76.5320,
+    origenLon: -76.532,
     destinoNombre: 'Buenaventura (Puerto Marítimo)',
     destinoLat: 3.8801,
     destinoLon: -77.0312,
@@ -66,24 +68,54 @@ export default function RutasScreen() {
   const { usuario } = useAuth();
   const {
     rutas,
+    conductores,
     cargando,
     cargarDatos,
+    cargarConductores,
     seleccionarRuta,
     rutaSeleccionada,
     evaluacionRetraso,
     crearRuta,
+    actualizarEstadoRuta,
   } = useRoutesStore();
   const router = useRouter();
 
   const [actualizando, setActualizando] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [creando, setCreando] = useState(false);
+  const [conductorSeleccionadoId, setConductorSeleccionadoId] = useState<string>('');
 
   useEffect(() => {
     cargarDatos();
+    cargarConductores();
   }, []);
 
-  const handleSelectRoute = (ruta: any) => {
+  // Seleccionar por defecto el primer conductor cuando la lista esté lista
+  useEffect(() => {
+    if (conductores.length > 0 && !conductorSeleccionadoId) {
+      setConductorSeleccionadoId(conductores[0].id);
+    }
+  }, [conductores, conductorSeleccionadoId]);
+
+  const rolActual = useMemo(() => {
+    if (usuario?.rol) return usuario.rol;
+    if (usuario?.correo?.includes('operador')) return 'operador';
+    if (usuario?.correo?.includes('cliente')) return 'consulta';
+    return 'conductor';
+  }, [usuario]);
+
+  const esOperador = rolActual === 'operador';
+  const esConductor = rolActual === 'conductor';
+
+  // Alerta para conductor: cuántas rutas pendientes tiene
+  const rutasPendientesConductor = useMemo(() => {
+    if (!esConductor) return [];
+    return rutas.filter(
+      (r) => r.estado === 'pendiente' && (!usuario?.id || r.usuarioId === usuario.id),
+    );
+  }, [rutas, esConductor, usuario]);
+
+  const handleSelectRoute = (ruta: RouteModel) => {
     seleccionarRuta(ruta);
   };
 
@@ -93,8 +125,8 @@ export default function RutasScreen() {
 
   const handleRefresh = async () => {
     setActualizando(true);
-    await cargarDatos();
-    setTimeout(() => setActualizando(false), 300);
+    await Promise.all([cargarDatos(), cargarConductores()]);
+    setActualizando(false);
   };
 
   const handleDispatchPreset = async (preset: typeof PRESET_FIXED_ROUTES[0]) => {
@@ -102,6 +134,7 @@ export default function RutasScreen() {
     const etaPactado = new Date(Date.now() + preset.tiempoEstimadoBaseMin * 60000).toISOString();
     await crearRuta({
       ...preset,
+      conductorId: conductorSeleccionadoId || undefined,
       etaPactado,
       estado: 'pendiente',
     });
@@ -109,8 +142,9 @@ export default function RutasScreen() {
     setModalVisible(false);
   };
 
-  const rolActual = usuario?.rol || 'conductor';
-  const esOperador = rolActual === 'operador';
+  const handleUpdateStatus = async (routeId: string, nuevoEstado: string) => {
+    await actualizarEstadoRuta(routeId, nuevoEstado);
+  };
 
   return (
     <View style={styles.container}>
@@ -170,13 +204,28 @@ export default function RutasScreen() {
         </View>
       </View>
 
+      {/* Alerta Destacada para el Conductor si tiene rutas pendientes de aceptar */}
+      {esConductor && rutasPendientesConductor.length > 0 && (
+        <View style={styles.conductorAlertCard}>
+          <Ionicons name="notifications-circle" size={24} color="#b45309" style={{ marginRight: 8 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.conductorAlertTitle}>
+              Tiene {rutasPendientesConductor.length} orden(es) pendiente(s) de confirmación
+            </Text>
+            <Text style={styles.conductorAlertSub}>
+              Revise los detalles y pulse &quot;Aceptar e Iniciar Viaje&quot; para iniciar el recorrido.
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Panel Exclusivo para el Rol Operador */}
       {esOperador && (
         <View style={styles.operatorCard}>
           <View style={{ flex: 1 }}>
             <Text style={styles.operatorTitle}>Panel de Despacho (Operador)</Text>
             <Text style={styles.operatorSubtitle}>
-              Cree y asigne rutas fijas a la flota de transporte
+              Cree rutas fijas y asígnelas al conductor seleccionado
             </Text>
           </View>
           <TouchableOpacity
@@ -248,6 +297,9 @@ export default function RutasScreen() {
             route={item}
             isSelected={rutaSeleccionada?.id === item.id}
             onPress={handleSelectRoute}
+            onUpdateStatus={handleUpdateStatus}
+            currentUserId={usuario?.id}
+            userRole={rolActual}
           />
         )}
         refreshControl={
@@ -291,39 +343,80 @@ export default function RutasScreen() {
                 <Ionicons name="close" size={24} color="#64748b" />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalSubtitle}>
-              Seleccione un corredor troncal nacional para asignar a la flota:
-            </Text>
 
-            {PRESET_FIXED_ROUTES.map((preset, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.presetItem}
-                onPress={() => handleDispatchPreset(preset)}
-                disabled={creando}
-                activeOpacity={0.7}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.presetManifiesto}>{preset.codigoManifiesto}</Text>
-                  <Text style={styles.presetRoute}>
-                    {preset.origenNombre} → {preset.destinoNombre}
-                  </Text>
-                  <Text style={styles.presetInfo}>
-                    {preset.distanciaTotalKm} km · {preset.tiempoEstimadoBaseMin / 60} horas estimadas
+            <ScrollView style={{ maxHeight: 420 }}>
+              {/* Sección 1: Selector de Conductor */}
+              <Text style={styles.modalSectionLabel}>1. Asignar al Conductor:</Text>
+              {conductores.length === 0 ? (
+                <Text style={styles.noDriversText}>Cargando conductores disponibles...</Text>
+              ) : (
+                <View style={styles.driverListContainer}>
+                  {conductores.map((c) => {
+                    const isSelected = conductorSeleccionadoId === c.id;
+                    return (
+                      <TouchableOpacity
+                        key={c.id}
+                        style={[
+                          styles.driverOptionChip,
+                          isSelected && styles.driverOptionChipSelected,
+                        ]}
+                        onPress={() => setConductorSeleccionadoId(c.id)}
+                      >
+                        <Ionicons
+                          name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                          size={16}
+                          color={isSelected ? '#1e3a8a' : '#94a3b8'}
+                          style={{ marginRight: 6 }}
+                        />
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.driverOptionName,
+                              isSelected && styles.driverOptionNameSelected,
+                            ]}
+                          >
+                            {c.nombre}
+                          </Text>
+                          <Text style={styles.driverOptionDoc}>{c.documento}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Sección 2: Seleccionar Corredor Troncal */}
+              <Text style={styles.modalSectionLabel}>2. Seleccione el Corredor Troncal:</Text>
+              {PRESET_FIXED_ROUTES.map((preset, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.presetItem}
+                  onPress={() => handleDispatchPreset(preset)}
+                  disabled={creando}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.presetManifiesto}>{preset.codigoManifiesto}</Text>
+                    <Text style={styles.presetRoute}>
+                      {preset.origenNombre} → {preset.destinoNombre}
+                    </Text>
+                    <Text style={styles.presetInfo}>
+                      {preset.distanciaTotalKm} km · {preset.tiempoEstimadoBaseMin / 60} horas estimadas
+                    </Text>
+                  </View>
+                  <Ionicons name="arrow-forward-circle" size={24} color="#1e3a8a" />
+                </TouchableOpacity>
+              ))}
+
+              {creando && (
+                <View style={styles.loadingBox}>
+                  <ActivityIndicator color="#1e3a8a" />
+                  <Text style={{ marginLeft: 8, color: '#1e3a8a', fontWeight: '500' }}>
+                    Despachando orden al conductor...
                   </Text>
                 </View>
-                <Ionicons name="arrow-forward-circle" size={24} color="#1e3a8a" />
-              </TouchableOpacity>
-            ))}
-
-            {creando && (
-              <View style={styles.loadingBox}>
-                <ActivityIndicator color="#1e3a8a" />
-                <Text style={{ marginLeft: 8, color: '#1e3a8a', fontWeight: '500' }}>
-                  Despachando orden al conductor...
-                </Text>
-              </View>
-            )}
+              )}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -413,6 +506,27 @@ const styles = StyleSheet.create({
     color: '#16a34a',
     fontWeight: '600',
   },
+  conductorAlertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 8,
+  },
+  conductorAlertTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400e',
+  },
+  conductorAlertSub: {
+    fontSize: 11,
+    color: '#b45309',
+    marginTop: 2,
+  },
   operatorCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -454,155 +568,196 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 4,
+    paddingBottom: 6,
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#334155',
   },
   refreshButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e2e8f0',
     paddingVertical: 5,
     paddingHorizontal: 10,
+    backgroundColor: '#e2e8f0',
     borderRadius: 6,
-    minWidth: 90,
-    justifyContent: 'center',
   },
   refreshButtonText: {
-    color: '#1e3a8a',
     fontSize: 12,
+    color: '#1e3a8a',
     fontWeight: '600',
   },
   listContent: {
-    padding: 16,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
   alertBox: {
-    margin: 16,
+    marginHorizontal: 16,
     marginBottom: 8,
-    padding: 14,
+    padding: 12,
     borderRadius: 8,
+    borderWidth: 1,
   },
   alertDelayed: {
     backgroundColor: '#fee2e2',
-    borderLeftWidth: 4,
-    borderLeftColor: '#dc2626',
+    borderColor: '#ef4444',
   },
   alertOk: {
-    backgroundColor: '#dcfce7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#16a34a',
+    backgroundColor: '#ecfdf5',
+    borderColor: '#10b981',
   },
   alertTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#1f2937',
   },
   alertSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#4b5563',
-    marginTop: 4,
+    marginVertical: 4,
   },
   mapButton: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    backgroundColor: '#1e3a8a',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 4,
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#1e3a8a',
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 4,
+    marginTop: 4,
   },
   mapButtonText: {
     color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: 'bold',
   },
   emptyContainer: {
-    padding: 32,
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
+    fontWeight: 'bold',
+    color: '#64748b',
     marginTop: 12,
   },
   emptyText: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 6,
+    fontSize: 12,
+    color: '#94a3b8',
     textAlign: 'center',
+    marginTop: 6,
     lineHeight: 18,
-    maxWidth: 280,
   },
   emptyButton: {
-    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1e3a8a',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 16,
   },
   emptyButtonText: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
-    padding: 20,
+    alignItems: 'center',
+    padding: 16,
   },
   modalCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 20,
+    padding: 18,
+    width: '100%',
+    maxWidth: 520,
+    elevation: 5,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   modalTitle: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: '#1e293b',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1e3a8a',
   },
-  modalSubtitle: {
+  modalSectionLabel: {
     fontSize: 13,
+    fontWeight: '700',
+    color: '#334155',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  noDriversText: {
+    fontSize: 12,
+    color: '#94a3b8',
+    fontStyle: 'italic',
+    marginBottom: 8,
+  },
+  driverListContainer: {
+    flexDirection: 'column',
+    gap: 6,
+    marginBottom: 8,
+  },
+  driverOptionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  driverOptionChipSelected: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#eff6ff',
+  },
+  driverOptionName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  driverOptionNameSelected: {
+    color: '#1e3a8a',
+    fontWeight: '700',
+  },
+  driverOptionDoc: {
+    fontSize: 11,
     color: '#64748b',
-    marginBottom: 16,
   },
   presetItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginVertical: 4,
+    backgroundColor: '#ffffff',
   },
   presetManifiesto: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#4338ca',
-    marginBottom: 2,
+    color: '#2563eb',
   },
   presetRoute: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1e293b',
+    marginTop: 2,
   },
   presetInfo: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748b',
     marginTop: 2,
   },
@@ -610,6 +765,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
+    paddingVertical: 12,
   },
 });
