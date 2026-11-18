@@ -1,5 +1,5 @@
 import axios from 'axios';
-import * as SecureStore from 'expo-secure-store';
+import { getSecureItem, setSecureItem, deleteSecureItem } from './secure-storage.adapter';
 import { AuthUser, RegistroDatos, Resultado, StoredSession } from '../../domain/entities/auth.model';
 import { API_BASE_URL } from '../config/api.config';
 
@@ -29,8 +29,8 @@ export async function crearUsuario(datos: RegistroDatos): Promise<Resultado<Auth
 export async function iniciarSesion(correo: string, contrasena: string): Promise<Resultado<AuthUser>> {
   try {
     const { data } = await client.post('/auth/mobile/login', { correo: correo.trim().toLowerCase(), contrasena });
-    await SecureStore.setItemAsync(TOKEN_KEY, data.token);
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data.usuario));
+    await setSecureItem(TOKEN_KEY, data.token);
+    await setSecureItem(USER_KEY, JSON.stringify(data.usuario));
     return { ok: true, datos: data.usuario };
   } catch (error) { return { ok: false, error: mensaje(error) }; }
 }
@@ -57,16 +57,16 @@ export async function restablecerContrasena(correo: string, respuesta: string, n
 }
 
 export async function obtenerUsuarioPorId(id: string): Promise<AuthUser | null> {
-  const token = await SecureStore.getItemAsync(TOKEN_KEY);
+  const token = await getSecureItem(TOKEN_KEY);
   if (!token) return null;
   try {
     const { data } = await client.get<AuthUser>('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
     if (data.id !== id) return null;
-    await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data));
+    await setSecureItem(USER_KEY, JSON.stringify(data));
     return data;
   } catch (error) {
     if (axios.isAxiosError(error) && error.response) return null;
-    const raw = await SecureStore.getItemAsync(USER_KEY);
+    const raw = await getSecureItem(USER_KEY);
     if (!raw) return null;
     const user = JSON.parse(raw) as AuthUser;
     return user.id === id ? user : null;
@@ -75,12 +75,12 @@ export async function obtenerUsuarioPorId(id: string): Promise<AuthUser | null> 
 
 export async function guardarSesion(userId: string, recordarme: boolean): Promise<void> {
   const sesion: StoredSession = { userId, recordarme, creadoEn: new Date().toISOString() };
-  await SecureStore.setItemAsync(SESION_KEY, JSON.stringify(sesion));
+  await setSecureItem(SESION_KEY, JSON.stringify(sesion));
 }
 
 export async function obtenerSesion(): Promise<StoredSession | null> {
   try {
-    const raw = await SecureStore.getItemAsync(SESION_KEY);
+    const raw = await getSecureItem(SESION_KEY);
     const session: StoredSession | null = raw ? JSON.parse(raw) : null;
     const firstRead = !verificacionInicialHecha;
     verificacionInicialHecha = true;
@@ -93,5 +93,5 @@ export async function obtenerSesion(): Promise<StoredSession | null> {
 }
 
 export async function borrarSesion(): Promise<void> {
-  await Promise.all([SESION_KEY, TOKEN_KEY, USER_KEY].map((key) => SecureStore.deleteItemAsync(key)));
+  await Promise.all([SESION_KEY, TOKEN_KEY, USER_KEY].map((key) => deleteSecureItem(key)));
 }

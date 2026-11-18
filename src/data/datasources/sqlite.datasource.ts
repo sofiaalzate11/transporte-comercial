@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import * as SecureStore from 'expo-secure-store';
+import { getSecureItem } from '../services/secure-storage.adapter';
 import { RouteModel, RouteSegmentModel } from '../../domain/entities/route.model';
 import { IncidentModel } from '../../domain/entities/incident.model';
 
@@ -8,7 +8,7 @@ export class SQLiteDataSource {
   private readonly databases = new Map<string, Promise<SQLite.SQLiteDatabase>>();
 
   async init(): Promise<void> {
-    const rawUser = await SecureStore.getItemAsync('auth_user');
+    const rawUser = await getSecureItem('auth_user');
     const userId = rawUser ? (JSON.parse(rawUser) as { id: string }).id : 'anonymous';
     const name = `transporte_${userId.replace(/[^a-zA-Z0-9-]/g, '')}.db`;
     let pending = this.databases.get(name);
