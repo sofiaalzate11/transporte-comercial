@@ -20,12 +20,14 @@ export const AuthScreen: React.FC<Props> = ({ titulo, subtitulo, children }) => 
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
         <ScrollView
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={false}
         >
           <View style={styles.encabezado}>
             <Text style={styles.titulo}>{titulo}</Text>
@@ -48,9 +50,10 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 1,
-    justifyContent: 'center',
     padding: 24,
-    paddingVertical: 32,
+    paddingTop: 32,
+    paddingBottom: 48,
+    justifyContent: 'center',
   },
   encabezado: {
     marginBottom: 24,

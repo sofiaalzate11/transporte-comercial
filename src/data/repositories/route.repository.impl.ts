@@ -71,4 +71,10 @@ export class RouteRepositoryImpl implements IRouteRepository {
       return CalculateDelayUseCase.execute(route, incidents);
     }
   }
+
+  async createRoute(dto: any): Promise<RouteModel> {
+    const route = await this.apiDs.createRoute(dto);
+    await this.sqliteDs.saveRoutes([route]);
+    return route;
+  }
 }

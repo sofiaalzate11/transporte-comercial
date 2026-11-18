@@ -99,26 +99,48 @@ export default function MapaScreen() {
             L.marker([inc.lat, inc.lon]).addTo(map).bindPopup(popupContent);
           });
 
-          // Renderizar ruta activa
+          // Renderizar ruta activa con trazado vial OSRM
           if (route) {
             const origen = [route.origen.lat, route.origen.lon];
             const destino = [route.destino.lat, route.destino.lon];
+            const lineColor = route.estado === 'retrasada' ? '#dc2626' : '#2563eb';
 
             // Marcadores de origen (A) y destino (B)
             L.marker(origen).addTo(map).bindPopup('<strong>ORIGEN (A):</strong> ' + route.origen.nombre);
             L.marker(destino).addTo(map).bindPopup('<strong>DESTINO (B):</strong> ' + route.destino.nombre);
 
-            // Polilínea de la ruta
-            const lineColor = route.estado === 'retrasada' ? '#dc2626' : '#2563eb';
-            const polyline = L.polyline([origen, destino], {
-              color: lineColor,
-              weight: 5,
-              opacity: 0.85,
-              dashArray: route.estado === 'retrasada' ? '8, 8' : null
-            }).addTo(map);
+            // Consultar geometria vial real en carreteras con OSRM
+            const osrmUrl = 'https://router.project-osrm.org/route/v1/driving/' +
+              route.origen.lon + ',' + route.origen.lat + ';' +
+              route.destino.lon + ',' + route.destino.lat + '?overview=full&geometries=geojson';
 
-            // Ajustar vista para encuadrar la ruta completa
-            map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+            fetch(osrmUrl)
+              .then(function(res) { return res.json(); })
+              .then(function(data) {
+                if (data.routes && data.routes.length > 0 && data.routes[0].geometry) {
+                  const roadLayer = L.geoJSON(data.routes[0].geometry, {
+                    style: {
+                      color: lineColor,
+                      weight: 5,
+                      opacity: 0.85,
+                      dashArray: route.estado === 'retrasada' ? '8, 8' : null
+                    }
+                  }).addTo(map);
+                  map.fitBounds(roadLayer.getBounds(), { padding: [50, 50] });
+                } else {
+                  throw new Error('Sin trazado OSRM');
+                }
+              })
+              .catch(function() {
+                // Fallback linea directa si OSRM no responde
+                const fallbackLine = L.polyline([origen, destino], {
+                  color: lineColor,
+                  weight: 5,
+                  opacity: 0.85,
+                  dashArray: route.estado === 'retrasada' ? '8, 8' : null
+                }).addTo(map);
+                map.fitBounds(fallbackLine.getBounds(), { padding: [50, 50] });
+              });
           }
         </script>
       </body>

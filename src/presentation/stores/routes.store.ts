@@ -19,6 +19,7 @@ interface RoutesState {
   cargarDatos: () => Promise<void>;
   seleccionarRuta: (ruta: RouteModel) => void;
   evaluarRetrasoRuta: (rutaId: string) => Promise<void>;
+  crearRuta: (dto: any) => Promise<boolean>;
 }
 
 export const useRoutesStore = create<RoutesState>((set, get) => ({
@@ -60,6 +61,17 @@ export const useRoutesStore = create<RoutesState>((set, get) => ({
       set({ evaluacionRetraso: resultado });
     } catch (e) {
       console.warn('Error calculando retraso:', e);
+    }
+  },
+
+  crearRuta: async (dto: any) => {
+    try {
+      await routeRepository.createRoute(dto);
+      await get().cargarDatos();
+      return true;
+    } catch (e) {
+      console.error('Error al crear ruta:', e);
+      return false;
     }
   },
 }));

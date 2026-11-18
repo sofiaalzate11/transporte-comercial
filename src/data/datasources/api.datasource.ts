@@ -42,4 +42,9 @@ export class ApiDataSource {
     const response = await this.client.post<IDelayEvaluationResult>(`/routes/${routeId}/evaluate-delay`);
     return response.data;
   }
+
+  async createRoute(dto: any): Promise<RouteModel> {
+    const response = await this.client.post<RouteModel>('/routes', dto);
+    return response.data;
+  }
 }

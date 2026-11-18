@@ -10,4 +10,5 @@ export interface IRouteRepository {
   saveIncidentsLocally(incidents: IncidentModel[]): Promise<void>;
   syncTelemetryBuffer(payload: ITelemetryPayload): Promise<boolean>;
   evaluateRouteDelay(routeId: string): Promise<IDelayEvaluationResult>;
+  createRoute(dto: any): Promise<RouteModel>;
 }
