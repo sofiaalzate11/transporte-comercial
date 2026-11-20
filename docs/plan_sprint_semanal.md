@@ -1,21 +1,21 @@
 # Daily y Plan de Trabajo Detallado: Sistema de Transporte Colombia
 
-Este documento contiene la planificación operativa y el desglose de tareas paso a paso para cada integrante del equipo. Las tareas para los integrantes novatos (**Sofia**, **Carlos** e **Isabella**) están explicadas de forma guiada, indicando archivos exactos, código sugerido y comandos de verificación. La asignación de **Duber** se mantiene intacta.
+Este documento contiene la planificación operativa y el desglose de tareas paso a paso para cada integrante del equipo, indicando archivos exactos, código sugerido y comandos de verificación. La asignación de **Duber** se mantiene como fue definida.
 
 ---
 
-## 1. Matriz General de Roles y Módulos
+## 1. Matriz General de Asignación por Integrante
 
-| Integrante | Nivel / Perfil | Rama Git | Módulo Asignado | Enfoque Principal |
-| :--- | :--- | :--- | :--- | :--- |
-| **Sofia Alzate** | Formación / Novato | `Sofia` | `shared/types`, `docs/`, QA Manual | Documentación de tipos, checklist de pruebas por rol y catálogo vial. |
-| **Carlos** | Formación / Novato | `Carlos` | Backend NestJS, Swagger, Seeds | Endpoint de salud, sembrado de incidentes de prueba y textos Swagger. |
-| **Isabella** | Formación / Novato | `Isabella` | Frontend Helpers, Almacenamiento | Utilidades de formateo vial, limpieza de caché y mensajes amigables. |
-| **Duber** | Avanzado / Lead Front | `Duber` | Vistas Expo Router v4, UI (`src/presentation/`) | Solución a teclado en login, trazado vial OSRM en mapa y selector de viaje. |
+| Integrante | Rama Git | Módulo Asignado | Enfoque Principal |
+| :--- | :--- | :--- | :--- |
+| **Sofia Alzate** | `Sofia` | `shared/types`, `docs/`, QA Funcional | Documentación de tipos, checklist de pruebas por rol y catálogo vial. |
+| **Carlos** | `Carlos` | Backend NestJS, Swagger, Seeds | Endpoint de salud, sembrado de incidentes de prueba y textos Swagger. |
+| **Isabella** | `Isabella` | Frontend Helpers, Almacenamiento | Utilidades de formateo vial, limpieza de caché y mensajes amigables. |
+| **Duber** | `Duber` | Vistas Expo Router v4, UI (`src/presentation/`) | Solución a teclado en login, trazado vial OSRM en mapa y selector de viaje. |
 
 ---
 
-## 2. Desglose Específico y Guiado por Integrante
+## 2. Desglose Específico de Tareas por Integrante
 
 ---
 
@@ -276,7 +276,7 @@ Este documento contiene la planificación operativa y el desglose de tareas paso
 
 ---
 
-## 3. Flujo de Trabajo Recomendado para Integrantes Novatos
+## 3. Flujo de Trabajo Recomendado para el Equipo
 
 ```
 1. Actualizar repositorio: git pull origin <mi-rama>
