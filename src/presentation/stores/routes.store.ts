@@ -13,20 +13,34 @@ const routeRepository = new RouteRepositoryImpl(sqliteDs, apiDs);
 interface RoutesState {
   rutas: RouteModel[];
   incidentes: IncidentModel[];
+  conductores: Array<{ id: string; nombre: string; documento: string; rol: string }>;
   rutaSeleccionada: RouteModel | null;
   evaluacionRetraso: IDelayEvaluationResult | null;
   cargando: boolean;
   cargarDatos: () => Promise<void>;
+  cargarConductores: () => Promise<void>;
   seleccionarRuta: (ruta: RouteModel) => void;
   evaluarRetrasoRuta: (rutaId: string) => Promise<void>;
+  crearRuta: (dto: any) => Promise<boolean>;
+  actualizarEstadoRuta: (rutaId: string, nuevoEstado: string) => Promise<boolean>;
 }
 
 export const useRoutesStore = create<RoutesState>((set, get) => ({
   rutas: [],
   incidentes: [],
+  conductores: [],
   rutaSeleccionada: null,
   evaluacionRetraso: null,
   cargando: false,
+
+  cargarConductores: async () => {
+    try {
+      const conductores = await routeRepository.getDrivers();
+      set({ conductores });
+    } catch (e) {
+      console.warn('Error cargando conductores:', e);
+    }
+  },
 
   cargarDatos: async () => {
     set({ cargando: true });
@@ -35,7 +49,15 @@ export const useRoutesStore = create<RoutesState>((set, get) => ({
         routeRepository.getRoutes(),
         routeRepository.getActiveIncidents(),
       ]);
-      set({ rutas, incidentes, cargando: false });
+      const seleccionadaActual = get().rutaSeleccionada;
+      const nuevaSeleccionada = seleccionadaActual
+        ? rutas.find((r) => r.id === seleccionadaActual.id) || rutas[0] || null
+        : rutas[0] || null;
+
+      set({ rutas, incidentes, rutaSeleccionada: nuevaSeleccionada, cargando: false });
+      if (nuevaSeleccionada) {
+        get().evaluarRetrasoRuta(nuevaSeleccionada.id);
+      }
     } catch {
       set({ cargando: false });
     }
@@ -52,6 +74,28 @@ export const useRoutesStore = create<RoutesState>((set, get) => ({
       set({ evaluacionRetraso: resultado });
     } catch (e) {
       console.warn('Error calculando retraso:', e);
+    }
+  },
+
+  crearRuta: async (dto: any) => {
+    try {
+      await routeRepository.createRoute(dto);
+      await get().cargarDatos();
+      return true;
+    } catch (e) {
+      console.error('Error al crear ruta:', e);
+      return false;
+    }
+  },
+
+  actualizarEstadoRuta: async (rutaId: string, nuevoEstado: string) => {
+    try {
+      await routeRepository.updateRouteStatus(rutaId, nuevoEstado);
+      await get().cargarDatos();
+      return true;
+    } catch (e) {
+      console.error('Error al actualizar estado:', e);
+      return false;
     }
   },
 }));

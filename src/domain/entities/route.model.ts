@@ -15,6 +15,12 @@ export interface RouteSegmentModel {
 export interface RouteModel {
   id: string;
   usuarioId: string;
+  usuario?: {
+    id: string;
+    nombre: string;
+    documento: string;
+    rol?: string;
+  };
   codigoManifiesto?: string;
   origenNombre: string;
   origenLat: number;

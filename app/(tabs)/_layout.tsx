@@ -1,6 +1,6 @@
 import React from 'react';
 import { Redirect, Tabs } from 'expo-router';
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/presentation/context/AuthContext';
 import { LogoutButton } from '../../src/presentation/components/LogoutButton';
 
@@ -27,7 +27,9 @@ export default function TabsLayout() {
         options={{
           title: 'Mis Rutas',
           tabBarLabel: 'Rutas',
-          tabBarIcon: () => <Text style={{ fontSize: 16 }}>📋</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trail-sign-outline" size={size} color={typeof color === 'string' ? color : '#1e3a8a'} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -35,7 +37,9 @@ export default function TabsLayout() {
         options={{
           title: 'Mapa Vial',
           tabBarLabel: 'Mapa',
-          tabBarIcon: () => <Text style={{ fontSize: 16 }}>🗺️</Text>,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="map-outline" size={size} color={typeof color === 'string' ? color : '#1e3a8a'} />
+          ),
         }}
       />
     </Tabs>
