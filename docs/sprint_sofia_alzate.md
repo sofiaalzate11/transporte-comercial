@@ -1,109 +1,86 @@
 # Plan de Trabajo Individual: Sofia Alzate (Rama `Sofia`)
 
-Este documento contiene las tareas asignadas para llevar a producción los contratos de datos, la experiencia de usuario del rol cliente y la suite de pruebas del sistema.
+Este documento contiene el plan de trabajo detallado de 10 tareas de producción para la estandarización de contratos de carga RNDC, experiencia del cliente y aseguramiento de calidad QA.
 
 ---
 
-## 1. Credenciales de Prueba para Verificación
+## 1. Credenciales de Prueba del Sistema
 
-| Rol a Probar | Usuario | Contraseña | Comportamiento Esperado |
+| Rol | Correo de Acceso | Contraseña | Uso en Validación |
 | :--- | :--- | :--- | :--- |
-| **Cliente / Consulta** | `cliente@transporte.com` | `Prueba123!` | Visualización de remesas, buscador de manifiestos y cálculo de retrasos. |
-| **Operador Central** | `operador@transporte.com` | `Prueba123!` | Crear despachos y verificar visibilidad del cliente. |
-| **Conductor** | `conductor@transporte.com` | `Prueba123!` | Ejecutar viaje asignado para verificar reflejo en cliente. |
+| **Cliente / Consulta** | `cliente@transporte.com` | `Prueba123!` | Validación de búsqueda de remesas, consulta de ETA y novedades. |
+| **Operador Central** | `operador@transporte.com` | `Prueba123!` | Creación de despachos con manifiesto y tipología vehicular. |
+| **Conductor** | `conductor@transporte.com` | `Prueba123!` | Verificación de checklists y registro de entrega con firma. |
 
 ---
 
-## 2. Tareas Asignadas Paso a Paso
+## 2. Backlog Exhaustivo de Tareas
 
-### Tarea SOF-01: Especificación de Contratos para Reporte de Novedades y Auditoría
-* **Objetivo:** Definir las interfaces TypeScript para el reporte en vía y la trazabilidad de eventos.
+### Tarea SOF-01: Contratos de Datos RNDC y Tipología Vehicular
 * **Archivo:** `transporte_colombia_front/src/shared/types/index.ts`.
-* **Pasos:**
-  1. Abrir `src/shared/types/index.ts`.
-  2. Agregar al final del archivo las siguientes definiciones:
-     ```typescript
-     /**
-      * Motivos válidos de suspensión temporal del transporte en carretera
-      */
-     export enum RouteSuspensionReason {
-       LANDSLIDE = 'derrumbe_bloqueo',
-       MECHANICAL_FAILURE = 'falla_mecanica',
-       POLICE_CHECKPOINT = 'control_autoridades',
-       MANDATORY_REST = 'descanso_reglamentario',
-       WEATHER_HAZARD = 'clima_adverso',
-     }
+* **Descripción:** Definir enumeraciones y modelos para vehículos de carga colombianos:
+  * `VehicleType`: `C2` (Camión sencillo 2 ejes), `C3` (Dobletroque 3 ejes), `C3S3` (Tractocamión con semirremolque de 3 ejes).
+  * `CargoDetails`: tipo de mercancía (seca, refrigerada, peligrosa), peso en kilogramos, volumen en metros cúbicos y valor asegurado en COP.
 
-     /**
-      * Evento de auditoría y trazabilidad histórica del viaje
-      */
-     export interface IRouteAuditEvent {
-       id: string;
-       routeId: string;
-       estadoAnterior: RouteStatus;
-       estadoNuevo: RouteStatus;
-       motivo?: string;
-       latitud?: number;
-       longitud?: number;
-       registradoEn: string;
-     }
+### Tarea SOF-02: Contrato de Prueba de Entrega Digital (POD)
+* **Archivo:** `transporte_colombia_front/src/shared/types/index.ts`.
+* **Descripción:** Especificar la interfaz `IProofOfDelivery`:
+  * `firmaBase64`: trazado vectorial de la firma en pantalla.
+  * `nombreReceptor`, `cedulaReceptor`, `observaciones`.
+  * `fotosEvidencia`: arreglo de URIs de fotografías de la carga entregada.
+  * `fechaHoraEntrega`, `latitudEntrega`, `longitudEntrega`.
 
-     /**
-      * Estructura de consulta de tracking público para clientes
-      */
-     export interface ITrackingPublicoResult {
-       codigoManifiesto: string;
-       origenNombre: string;
-       destinoNombre: string;
-       estado: RouteStatus;
-       etaPactado: string;
-       etaRecalculado?: string;
-       minutosRetraso: number;
-       incidentesEnRuta: number;
-       conductorNombre: string;
-       ultimaActualizacion: string;
-     }
-     ```
-  3. Guardar el archivo.
-* **Comando de verificación:**
-  ```bash
-  npm run lint
-  ```
+### Tarea SOF-03: Contrato de Inspección Pre-operacional del Camión
+* **Archivo:** `transporte_colombia_front/src/shared/types/index.ts`.
+* **Descripción:** Especificar la interfaz `IVehicleInspection`:
+  * Estado de frenos, nivel de aceite, presión de llantas, luces, kit de carreteras.
+  * Vigencia de SOAT y Revisión Técnico-Mecánica.
+  * Firma de conformidad del conductor antes de encender el motor.
 
----
+### Tarea SOF-04: Contrato de Estaciones de Peaje y Tarifas Viales
+* **Archivo:** `transporte_colombia_front/src/shared/types/index.ts`.
+* **Descripción:** Especificar la interfaz `ITollStation`:
+  * `nombrePeaje`, `concesionVial`, `latitud`, `longitud`.
+  * Tarifas oficiales según categoría de vehículo (Categoría I a V).
 
-### Tarea SOF-02: Vista de Seguimiento para Clientes (`cliente.tsx`)
-* **Objetivo:** Crear una pantalla donde el cliente consulte el estado de su carga por código de manifiesto.
-* **Archivo a crear:** `transporte_colombia_front/src/presentation/components/TrackingClienteModal.tsx`.
-* **Pasos:**
-  1. Crear el componente con un campo de búsqueda por texto (`MAN-XXXXX`).
-  2. Si el código coincide con una ruta existente, desplegar:
-     * Origen (Salida) y Destino (Entrada).
-     * Estado del envío (`EN RUTA`, `COMPLETADA`, `SUSPENDIDA`).
-     * Hora estimada de entrega original y recalcula.
-     * Alerta visual clara si hay derrumbes o cierres viales afectando la remesa.
-* **Comando de verificación:** Ejecutar `npm run lint` para garantizar tipado estricto.
+### Tarea SOF-05: Componente de Rastreo Público por Manifiesto (`TrackingClienteModal.tsx`)
+* **Archivo:** `transporte_colombia_front/src/presentation/components/TrackingClienteModal.tsx`.
+* **Descripción:** Diseñar modal con barra de búsqueda para que el cliente ingrese su código de remesa (`MAN-XXXXX`) y visualice el estado sin necesidad de iniciar sesión de operador.
+
+### Tarea SOF-06: Vista Detallada de Estado de Carga para Clientes
+* **Archivo:** `transporte_colombia_front/src/presentation/components/DetalleCargaCliente.tsx`.
+* **Descripción:** Componente que despliega la barra de progreso del viaje (Salida -> En Tránsito -> Llegada), tiempo restante ajustado por incidentes y ubicación del último reporte.
+
+### Tarea SOF-07: Catálogo de Corredores y Peajes Nacionales de Colombia
+* **Archivo:** `transporte_colombia_front/docs/catalogo_vias_colombia.md`.
+* **Descripción:** Documentar las 5 rutas troncales principales de Colombia (Ruta 40 Bogotá-Buenaventura, Ruta 25 Medellín-Cali, Ruta 45 Bogotá-Costa Caribe, Ruta 50 Bogotá-Manizales, Ruta 65 Villavicencio-Yopal) con sus peajes clave.
+
+### Tarea SOF-08: Matriz de 25 Casos de Prueba de Aceptación (QA Integral)
+* **Archivo:** `transporte_colombia_front/docs/manual_qa_aceptacion.md`.
+* **Descripción:** Documentar casos de prueba para:
+  1. Conductor intentando aceptar dos viajes activos.
+  2. Suspensión de ruta con y sin motivo justificado.
+  3. Desconexión de internet en pleno tránsito y reconexión posterior.
+  4. Recálculo automático de ETA ante derrumbe.
+
+### Tarea SOF-09: Manual de Procedimiento para Conductores en Carretera
+* **Archivo:** `transporte_colombia_front/docs/manual_conductor.md`.
+* **Descripción:** Guía paso a paso ilustrada explicando cómo iniciar el viaje, cómo reportar una novedad en vía, cómo actuar ante un derrumbe y cómo recolectar la firma digital de entrega.
+
+### Tarea SOF-10: Manual de Gestión y Despacho para Operadores de Central
+* **Archivo:** `transporte_colombia_front/docs/manual_operador.md`.
+* **Descripción:** Guía de operaciones que detalla la asignación de conductores, interpretación de alertas de retraso vial del INVIAS y procedimientos de contingencia en caso de cierre total de carretera.
 
 ---
 
-### Tarea SOF-03: Manual de Aceptación y Checklist QA por Roles
-* **Objetivo:** Documentar los casos de prueba de aceptación para validar el sistema antes del despliegue.
-* **Archivo a crear:** `transporte_colombia_front/docs/manual_qa_aceptacion.md`.
-* **Contenido obligatorio:**
-  1. **Matriz de permisos:** Validar que el rol `consulta` no pueda crear rutas ni cambiar estados.
-  2. **Regla de oro:** Validar que si `conductor@transporte.com` tiene un viaje activo, la interfaz no permita iniciar otro.
-  3. **Caso Offline:** Desconectar internet en el navegador (Modo Offline en DevTools) y verificar que las rutas guardadas en `AsyncStorage` siguen visibles.
-
----
-
-## 3. Verificación y Entrega
+## 3. Comandos de Verificación
 
 ```bash
-# 1. Asegurar no romper la compilación
+# Validar sintaxis y tipado estricto
 npm run lint
 
-# 2. Confirmar cambios en rama propia
+# Sincronizar en rama individual
 git add .
-git commit -m "feat(types-qa): contratos de tracking y modulo de cliente"
+git commit -m "feat(types-qa): paquete integral de contratos RNDC, tracking y manuales"
 git push origin Sofia
 ```

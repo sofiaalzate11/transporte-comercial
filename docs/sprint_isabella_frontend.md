@@ -1,108 +1,70 @@
 # Plan de Trabajo Individual: Isabella (Rama `Isabella`)
 
-Este documento detalla las tareas asignadas en el frontend móvil (`transporte_colombia_front`) enfocadas en resiliencia offline, utilidades de interfaz y el flujo de suspensión justificada para conductores.
+Este documento detalla el plan de trabajo de 10 tareas de producción para el frontend móvil (`transporte_colombia_front`), enfocado en la experiencia del conductor en carretera, resiliencia offline y captura de pruebas en terreno.
 
 ---
 
-## 1. Credenciales de Prueba para Verificación
+## 1. Credenciales de Prueba del Sistema
 
-| Rol a Probar | Correo de Acceso | Contraseña | Objetivo de Prueba |
+| Rol | Correo de Acceso | Contraseña | Uso en Validación |
 | :--- | :--- | :--- | :--- |
-| **Conductor** | `conductor@transporte.com` | `Prueba123!` | Probar botones de viaje, suspensión justificada y persistencia offline. |
-| **Operador** | `operador@transporte.com` | `Prueba123!` | Comprobar recepción del estado y motivo de suspensión. |
+| **Conductor** | `conductor@transporte.com` | `Prueba123!` | Validación de inspección preoperacional, botón SOS, firma de entrega y GPS. |
+| **Operador** | `operador@transporte.com` | `Prueba123!` | Verificación de recepción de novedades, firmas y telemetría de ruta. |
 
 ---
 
-## 2. Tareas Asignadas Paso a Paso
+## 2. Backlog Exhaustivo de Tareas
 
-### Tarea ISA-01: Módulo de Formateadores Viales (`formatters.ts`)
-* **Objetivo:** Estandarizar la visualización de distancias, tiempos y fechas en toda la aplicación.
-* **Archivo a crear:** `transporte_colombia_front/src/shared/utils/formatters.ts`.
-* **Pasos:**
-  1. Crear `src/shared/utils/formatters.ts`.
-  2. Implementar las funciones de formato:
-     ```typescript
-     /**
-      * Formatea kilómetros a un decimal exacto (ej: 135.5 km)
-      */
-     export function formatearKm(distanciaKm: number): string {
-       if (isNaN(distanciaKm) || distanciaKm < 0) return '0.0 km';
-       return `${distanciaKm.toFixed(1)} km`;
-     }
+### Tarea ISA-01: Formateadores Viales y Moneda Colombiana (`formatters.ts`)
+* **Archivo:** `transporte_colombia_front/src/shared/utils/formatters.ts`.
+* **Descripción:** Implementar funciones para formatear distancias (`135.5 km`), tiempos de conducción (`3h 45m`), moneda nacional (`$ 45.000 COP`) y peso de carga (`28.5 Ton`).
 
-     /**
-      * Convierte minutos a formato horas/minutos (ej: 180 min -> 3h 0m)
-      */
-     export function formatearMinutos(minutos: number): string {
-       if (isNaN(minutos) || minutos <= 0) return '0 min';
-       const h = Math.floor(minutos / 60);
-       const m = Math.round(minutos % 60);
-       return h > 0 ? `${h}h ${m}m` : `${m} min`;
-     }
+### Tarea ISA-02: Modal de Suspensión Justificada (`SuspensionModal.tsx`)
+* **Archivo:** `transporte_colombia_front/src/presentation/components/SuspensionModal.tsx`.
+* **Descripción:** Diseñar modal emergente que exige al conductor seleccionar el motivo antes de suspender el viaje (Derrumbe, Falla Mecánica, Control Policial, Descanso Obligatorio).
 
-     /**
-      * Formatea hora militar a hora estándar con periodo AM/PM
-      */
-     export function formatearHoraColombia(fechaIso: string): string {
-       try {
-         const date = new Date(fechaIso);
-         return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-       } catch {
-         return '--:--';
-       }
-     }
-     ```
-  3. Guardar el archivo.
-* **Comando de verificación:** Ejecutar `npm run lint`.
+### Tarea ISA-03: Componente de Firma Digital en Pantalla (`SignaturePadModal.tsx`)
+* **Archivo:** `transporte_colombia_front/src/presentation/components/SignaturePadModal.tsx`.
+* **Descripción:** Permitir al cliente o receptor firmar directamente con el dedo sobre la pantalla al momento de entregar la mercancía, capturando el trazo en Base64.
 
----
+### Tarea ISA-04: Checklist de Inspección Pre-operacional del Camión
+* **Archivo:** `transporte_colombia_front/src/presentation/components/PreInspectionModal.tsx`.
+* **Descripción:** Formulario obligatorio antes de iniciar el viaje: verificación visual de presión de llantas, frenos de aire, luces, nivel de refrigerante y kit de derrames.
 
-### Tarea ISA-02: Modal de Selección de Motivo de Suspensión (`SuspensionModal.tsx`)
-* **Objetivo:** Cuando un conductor pulse "Poner en Suspensión", desplegar un modal para que seleccione el motivo antes de enviar la petición.
-* **Archivo a crear:** `transporte_colombia_front/src/presentation/components/SuspensionModal.tsx`.
-* **Opciones a desplegar en el modal:**
-  * 🚧 Derrumbe / Cierre de vía.
-  * 🔧 Falla mecánica del camión.
-  * 👮 Control de autoridades / Retén policial.
-  * 🛌 Descanso reglamentario obligatorio.
-  * 🌧️ Condiciones climáticas adversas (neblina / lluvia torrencial).
-* **Comportamiento:**
-  * Al elegir una opción y pulsar "Confirmar Suspensión", invocar la actualización de estado a `en_suspension`.
-* **Comando de verificación:** Ejecutar `npm run lint`.
+### Tarea ISA-05: Captura y Adjunto de Fotos de Remesa y Mercancía
+* **Archivo:** `transporte_colombia_front/src/presentation/components/EvidenceCameraPicker.tsx`.
+* **Descripción:** Módulo para tomar o adjuntar fotos de la carga entregada y la remesa física sellada para certificar la entrega completa.
+
+### Tarea ISA-06: Formulario de Reporte de Novedades en Vía por Conductor
+* **Archivo:** `transporte_colombia_front/src/presentation/components/ReportIncidentModal.tsx`.
+* **Descripción:** Permitir al conductor reportar en 2 clics si encuentra un derrumbe, retén o accidente en carretera, enviando automáticamente sus coordenadas GPS actuales.
+
+### Tarea ISA-07: Botón SOS de Emergencia en Cabina
+* **Archivo:** `transporte_colombia_front/src/presentation/components/EmergencyButton.tsx`.
+* **Descripción:** Botón rojo de alta visibilidad para situaciones de riesgo (intento de hurto, volcamiento, emergencia médica) que emite alerta inmediata a la central de despacho.
+
+### Tarea ISA-08: Tarea de Telemetría GPS en Segundo Plano
+* **Archivo:** `transporte_colombia_front/src/data/services/telemetry-sync.service.ts`.
+* **Descripción:** Configurar `expo-location` y `TaskManager` para registrar la posición del camión cada 30 segundos mientras la ruta esté en estado `en_ruta`.
+
+### Tarea ISA-09: Gestor de Sincronización Automática Offline
+* **Archivo:** `transporte_colombia_front/src/data/services/offline-sync.manager.ts`.
+* **Descripción:** Detectar cuándo el teléfono pierde señal en cañones o cordilleras, acumular los puntos de telemetría y eventos en SQLite/AsyncStorage, y vaciar la cola automáticamente al recuperar cobertura 4G.
+
+### Tarea ISA-10: Limpieza Segura de Almacenamiento Local en Logout
+* **Archivo:** `transporte_colombia_front/src/data/services/auth.storage.ts`.
+* **Descripción:** Garantizar que al pulsar "Cerrar sesión" se eliminen de `AsyncStorage` todas las llaves temporales de rutas e incidentes para proteger la privacidad entre turnos de conductores.
 
 ---
 
-### Tarea ISA-03: Limpieza Integral de Almacenamiento Local en Logout
-* **Objetivo:** Garantizar que al cerrar sesión no queden registros en `AsyncStorage` de la sesión anterior.
-* **Archivo a modificar:** `transporte_colombia_front/src/data/services/auth.storage.ts`.
-* **Pasos:**
-  1. Abrir `src/data/services/auth.storage.ts`.
-  2. En la función `borrarSesion()`, asegurar que se borren tanto las credenciales seguras como los datos cacheados:
-     ```typescript
-     export async function borrarSesion(): Promise<void> {
-       await Promise.all([
-         deleteSecureItem(SESION_KEY),
-         deleteSecureItem(TOKEN_KEY),
-         deleteSecureItem(USER_KEY),
-       ]);
-       try {
-         const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-         await AsyncStorage.multiRemove(['@web_routes', '@web_incidents']);
-       } catch {}
-     }
-     ```
-* **Comando de verificación:** Ejecutar `npm run lint`.
-
----
-
-## 3. Verificación y Entrega
+## 3. Comandos de Verificación
 
 ```bash
-# 1. Asegurar cero errores de TypeScript
+# Validar sintaxis y cero errores de TypeScript
 npm run lint
 
-# 2. Confirmar cambios en rama propia
+# Sincronizar en rama individual
 git add .
-git commit -m "feat(offline-ui): formateadores viales y modal de suspension justificada"
+git commit -m "feat(mobile-driver): firma digital, inspeccion preoperacional y offline sync"
 git push origin Isabella
 ```

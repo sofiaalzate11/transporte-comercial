@@ -1,96 +1,82 @@
 # Plan de Trabajo Individual: Carlos (Rama `Carlos`)
 
-Este documento detalla las tareas asignadas para el backend NestJS (`Transporte-Comercial-BACK`), asegurando persistencia transaccional, trazabilidad y endpoints para soporte de operaciones y clientes.
+Este documento detalla el plan de trabajo exhaustivo de 11 tareas de producción para el backend NestJS (`Transporte-Comercial-BACK`), enfocado en lógica transaccional, normatividad de carga y persistencia robusta.
 
 ---
 
-## 1. Credenciales de Acceso a Base de Datos y APIs
+## 1. Credenciales y Conexiones Locales
 
-| Servicio | Variable de Entorno | Valor Local Oficial |
+| Entorno | Detalle | Parámetro de Conexión |
 | :--- | :--- | :--- |
-| **Base de Datos** | `postgresql://...` | `postgresql://postgres:postgrespassword@localhost:5432/transporte_colombia` |
-| **Documentación** | Swagger UI | `http://localhost:3000/api/docs` |
-| **Token de Prueba Operador** | `operador@transporte.com` | Contraseña: `Prueba123!` |
-| **Token de Prueba Conductor** | `conductor@transporte.com` | Contraseña: `Prueba123!` |
+| **PostgreSQL** | Base de Datos Principal | `postgresql://postgres:postgrespassword@localhost:5432/transporte_colombia` |
+| **Swagger** | Documentación OpenAPI | `http://localhost:3000/api/docs` |
+| **Token Operador** | `operador@transporte.com` | Contraseña: `Prueba123!` |
+| **Token Conductor** | `conductor@transporte.com` | Contraseña: `Prueba123!` |
 
 ---
 
-## 2. Tareas Asignadas Paso a Paso
+## 2. Backlog Exhaustivo de Tareas
 
-### Tarea CAR-01: Endpoint de Suspensión Justificada (`PATCH /routes/:id/suspend`)
-* **Objetivo:** Permitir que al suspender un viaje en carretera, el conductor u operador suministre obligatoriamente el motivo (`derrumbe`, `falla_mecanica`, `descanso`).
-* **Archivos:** `src/routes/routes.controller.ts`, `src/routes/routes.service.ts`, `src/routes/route.dto.ts`.
-* **Pasos:**
-  1. En `src/routes/route.dto.ts`, crear:
-     ```typescript
-     export class SuspendRouteDto {
-       @ApiProperty({ description: 'Motivo de la suspensión temporal' })
-       @IsString()
-       @IsNotEmpty()
-       motivo: string;
-     }
-     ```
-  2. En `src/routes/routes.service.ts`, agregar método `suspendRoute(id: string, motivo: string, user: UserEntity)`:
-     * Verificar que la ruta exista y pertenezca al conductor o el usuario sea operador.
-     * Cambiar estado a `RouteStatus.SUSPENDED` (`en_suspension`).
-     * Guardar el cambio y registrar en consola o log el motivo de la suspensión.
-  3. En `src/routes/routes.controller.ts`, exponer `@Patch(':id/suspend')`.
-* **Comando de verificación:** Ejecutar `npm run build` en la terminal del backend.
+### Tarea CAR-01: Módulo y Entidad de Estaciones de Peaje (`toll.entity.ts`)
+* **Archivos:** `src/tolls/entities/toll.entity.ts`, `src/tolls/tolls.service.ts`, `src/tolls/tolls.module.ts`.
+* **Descripción:** Modelar tabla con nombre del peaje, concesión vial, coordenadas geográficas y tarifas vigentes en Colombia para categorías I a V.
 
----
+### Tarea CAR-02: Endpoint de Estimación de Peajes y Costos (`POST /routes/estimate-tolls`)
+* **Archivos:** `src/tolls/tolls.controller.ts`, `src/tolls/tolls.service.ts`.
+* **Descripción:** Recibir las coordenadas de origen y destino junto con la categoría del camión (`C2`, `C3`, `C3S3`) y retornar el listado de peajes que interceptan la ruta con el costo total acumulado en COP.
 
-### Tarea CAR-02: Endpoint de Consulta por Manifiesto (`GET /routes/track/:code`)
-* **Objetivo:** Permitir a clientes consultar el estado y retraso de su carga buscando por número de manifiesto (ej: `MAN-40-BOG-GIR`).
+### Tarea CAR-03: Módulo de Prueba de Entrega Digital POD (`pod.entity.ts`)
+* **Archivos:** `src/routes/entities/pod.entity.ts`, `src/routes/routes.service.ts`, `src/routes/routes.controller.ts`.
+* **Descripción:** Endpoint `POST /routes/:id/pod` para almacenar la firma digital en base64 del receptor, cédula, nombre, observaciones y fotografías de respaldo de la entrega.
+
+### Tarea CAR-04: Módulo de Inspección Pre-operacional del Camión
+* **Archivos:** `src/routes/entities/inspection.entity.ts`, `src/routes/routes.service.ts`.
+* **Descripción:** Endpoint `POST /routes/:id/pre-inspection` para validar el checklist del camión antes de permitir que la ruta pase al estado `en_ruta`.
+
+### Tarea CAR-05: Endpoint de Suspensión Justificada (`PATCH /routes/:id/suspend`)
 * **Archivos:** `src/routes/routes.controller.ts`, `src/routes/routes.service.ts`.
-* **Pasos:**
-  1. En `routes.service.ts`:
-     ```typescript
-     async findByManifest(code: string) {
-       const route = await this.routes.findOne({
-         where: { codigoManifiesto: code },
-         relations: ['usuario'],
-       });
-       if (!route) throw new NotFoundException('Manifiesto no encontrado');
-       return {
-         codigoManifiesto: route.codigoManifiesto,
-         origen: route.origenNombre,
-         destino: route.destinoNombre,
-         estado: route.estado,
-         etaPactado: route.etaPactado,
-         distanciaKm: route.distanciaTotalKm,
-         tiempoBaseMin: route.tiempoEstimadoBaseMin,
-         conductor: route.usuario?.nombre || 'Asignado',
-       };
-     }
-     ```
-  2. En `routes.controller.ts`, agregar endpoint público o con JWT `@Get('track/:code')`.
-* **Comando de verificación:** `curl http://localhost:3000/routes/track/MAN-40-BOG-GIR`.
+* **Descripción:** Endpoint que valida el motivo de suspensión suministrado (`derrumbe`, `falla_mecanica`, `descanso`, `autoridades`) y transiciona el viaje a `en_suspension`.
 
----
+### Tarea CAR-06: Endpoint de Consulta por Manifiesto (`GET /routes/track/:code`)
+* **Archivos:** `src/routes/routes.controller.ts`, `src/routes/routes.service.ts`.
+* **Descripción:** Endpoint público que recibe un código de manifiesto (ej: `MAN-40-BOG-GIR`) y devuelve el estado actual, conductor asignado, hora pactada y retraso recalculado sin exponer contraseñas ni datos sensibles.
 
-### Tarea CAR-03: Semilla Oficial de Incidentes Viales de Colombia
-* **Objetivo:** Disponer de incidentes de prueba sobre corredores reales (Ruta 40, Ruta 25 y Ruta 50) para que el motor de retrasos siempre tenga datos evaluables.
+### Tarea CAR-07: Bitácora de Auditoría Transaccional (`route-audit.entity.ts`)
+* **Archivos:** `src/routes/entities/route-audit.entity.ts`, `src/routes/routes.service.ts`.
+* **Descripción:** Cada vez que una ruta cambia de estado (`pendiente` -> `en_ruta` -> `en_suspension` -> `completada`), registrar automáticamente el usuario responsable, timestamp y motivo del cambio.
+
+### Tarea CAR-08: Semilla Completa de Incidentes INVIAS (`seed-incidentes.ts`)
 * **Archivo:** `src/database/seeds/seed-incidentes.ts`.
-* **Pasos:**
-  1. Crear archivo con 5 incidentes reales:
-     * Cierre parcial por derrumbe en Alto de La Línea (Ruta 40).
-     * Mantenimiento vial en Silvania (Bogotá - Girardot).
-     * Paso restringido en La Pintada (Medellín - Manizales).
-     * Protesta ciudadana en El Cerrito (Cali - Palmira).
-     * Cierre preventivo por lluvia en Vía al Llano (Bogotá - Villavicencio).
-  2. Agregar comando o función autoejecutable en `AppModule` si la tabla `incidentes_viales` tiene 0 registros.
-* **Comando de verificación:** Verificar en Swagger `GET /road-incidents` con status 200.
+* **Descripción:** Sembrar en PostgreSQL incidentes reales sobre los principales pasos de cordillera de Colombia: Alto de La Línea, Cañón del Cauca, Vía al Llano, Ventanas y Páramo de Letras.
+
+### Tarea CAR-09: Endpoint de Monitoreo de Salud del Sistema (`GET /health`)
+* **Archivo:** `src/app.controller.ts`.
+* **Descripción:** Endpoint que responde el estado de salud de la API, tiempo de actividad (uptime) y verificación de conectividad con PostgreSQL.
+
+### Tarea CAR-10: Pruebas Unitarias del Servicio de Rutas (`routes.service.spec.ts`)
+* **Archivo:** `src/routes/routes.service.spec.ts`.
+* **Descripción:** Crear suite de pruebas con Jest para validar:
+  1. Que un conductor no pueda iniciar dos viajes simultáneamente.
+  2. Que una ruta suspendida requiera motivo.
+  3. Que el cálculo de retraso sume los minutos de incidentes que intercepten el corredor.
+
+### Tarea CAR-11: Dockerización del Entorno de Backend
+* **Archivos:** `Dockerfile`, `docker-compose.yml`.
+* **Descripción:** Configurar contenedor Docker para NestJS en modo producción y orquestación con PostgreSQL 15, garantizando despliegue portable en cualquier servidor.
 
 ---
 
-## 3. Verificación y Entrega
+## 3. Comandos de Verificación
 
 ```bash
-# 1. Compilar y asegurar cero errores de TypeScript
+# Compilar TypeScript sin errores
 npm run build
 
-# 2. Confirmar cambios en rama propia
+# Ejecutar pruebas unitarias
+npm test
+
+# Sincronizar en rama individual
 git add .
-git commit -m "feat(routes-backend): endpoint de suspension justificada y tracking por manifiesto"
+git commit -m "feat(backend-prod): peajes, POD, auditoria y dockerizacion"
 git push origin Carlos
 ```
