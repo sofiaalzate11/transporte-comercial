@@ -22,7 +22,7 @@ Respuesta de seguridad para las tres cuentas: `Prueba`.
 | QA-02 | Registro de operador | Nuevo usuario | Repetir registro eligiendo "Operador de central". | `rol = operador`; acceso a creación de despachos. | Alta |
 | QA-03 | Registro de conductor | Nuevo usuario | Repetir registro eligiendo "Conductor". | `rol = conductor`; acceso a checklists y POD. | Alta |
 | QA-04 | Correo duplicado | Nuevo usuario | Registrar dos veces el mismo correo. | Segundo intento muestra "Este correo ya está registrado" en el campo correo; no se crea otra cuenta. | Alta |
-| QA-05 | Login con credenciales de prueba | Los 3 roles | Ingresar cada correo con `Prueba123!`, marcar "Recordarme", reiniciar la app. | Sesión restaurada para los tres roles; token y usuario presentes en almacenamiento seguro. | Crítica |
+| QA-05 | Login con credenciales de prueba | Los 3 roles | Ingresar cada correo con `Prueba123!`, marcar "Recordarme", reiniciar la app. | Sesión restaurada para los tres roles. Si el correo ya existía con otra contraseña, se repara automáticamente y el login funciona igual. | Crítica |
 | QA-06 | Consulta pública por manifiesto válido | Cliente (sin login) | Desde login tocar "Consultar el estado de una remesa", digitar `MAN-10425`. | Modal muestra etapa, ETA, incidentes y último reporte; no se solicita sesión de operador. | Crítica |
 | QA-07 | Consulta con formato inválido | Cliente | Digitar `10425` y consultar. | Error: "El código debe tener el formato MAN-XXXXX"; no se ejecuta la búsqueda. | Alta |
 | QA-08 | Consulta con derrumbe activo | Cliente | Consultar un código par (ej. `MAN-10424`). | ETA ajustado mayor al base; se listan derrumbe y minutos de impacto. | Alta |

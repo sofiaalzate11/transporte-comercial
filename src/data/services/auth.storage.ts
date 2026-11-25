@@ -133,44 +133,88 @@ async function leerUsuarios(): Promise<StoredUser[]> {
 
 let promesaUsuariosPrueba: Promise<void> | null = null;
 
-async function sembrarUsuariosPrueba(): Promise<void> {
-  const usuarios = await leerUsuarios();
-  const faltantes = USUARIOS_PRUEBA.filter(
-    (usuario) =>
-      !usuarios.some(
-        (guardado) => guardado.correo === normalizarCorreo(usuario.correo),
-      ),
-  );
+async function construirUsuarioPrueba(
+  usuario: UsuarioPrueba,
+  existente?: StoredUser,
+): Promise<StoredUser> {
+  const contrasenaSal = generarSal();
+  const respuestaSal = generarSal();
+  const [contrasenaHash, respuestaHash] = await Promise.all([
+    generarHash(usuario.contrasena, contrasenaSal),
+    generarHash(normalizarRespuesta(RESPUESTA_PRUEBA), respuestaSal),
+  ]);
 
-  if (faltantes.length === 0) {
-    return;
+  return {
+    id: existente?.id ?? generarId(),
+    nombre: usuario.nombre,
+    correo: normalizarCorreo(usuario.correo),
+    contrasenaHash,
+    contrasenaSal,
+    preguntaSeguridad: PREGUNTA_PRUEBA,
+    respuestaHash,
+    respuestaSal,
+    rol: usuario.rol,
+    creadoEn: existente?.creadoEn ?? new Date().toISOString(),
+  };
+}
+
+async function necesitaReparacion(
+  guardado: StoredUser,
+  usuario: UsuarioPrueba,
+): Promise<boolean> {
+  if (
+    !guardado.contrasenaHash ||
+    !guardado.contrasenaSal ||
+    !guardado.respuestaHash ||
+    !guardado.respuestaSal ||
+    guardado.preguntaSeguridad !== PREGUNTA_PRUEBA ||
+    guardado.rol !== usuario.rol
+  ) {
+    return true;
   }
 
-  const nuevos = await Promise.all(
-    faltantes.map(async (usuario): Promise<StoredUser> => {
-      const contrasenaSal = generarSal();
-      const respuestaSal = generarSal();
-      const [contrasenaHash, respuestaHash] = await Promise.all([
-        generarHash(usuario.contrasena, contrasenaSal),
-        generarHash(normalizarRespuesta(RESPUESTA_PRUEBA), respuestaSal),
-      ]);
+  try {
+    const hash = await generarHash(usuario.contrasena, guardado.contrasenaSal);
+    return !compararSeguro(hash, guardado.contrasenaHash);
+  } catch {
+    return true;
+  }
+}
 
-      return {
-        id: generarId(),
-        nombre: usuario.nombre,
-        correo: normalizarCorreo(usuario.correo),
-        contrasenaHash,
-        contrasenaSal,
-        preguntaSeguridad: PREGUNTA_PRUEBA,
-        respuestaHash,
-        respuestaSal,
-        rol: usuario.rol,
-        creadoEn: new Date().toISOString(),
-      };
+/**
+ * Las cuentas de prueba son administradas por la app: si ya existían con otra
+ * contraseña, con un rol distinto o con campos incompletos, se reparan.
+ * Así se evita el error "Correo o contraseña incorrectos" tras cambiar de
+ * versión o haber registrado previamente el mismo correo.
+ */
+async function sembrarUsuariosPrueba(): Promise<void> {
+  const usuarios = await leerUsuarios();
+  let huboCambios = false;
+
+  const resultantes = await Promise.all(
+    usuarios.map(async (guardado): Promise<StoredUser> => {
+      const demo = USUARIOS_PRUEBA.find(
+        (usuario) => normalizarCorreo(usuario.correo) === guardado.correo,
+      );
+      if (!demo || !(await necesitaReparacion(guardado, demo))) {
+        return guardado;
+      }
+      huboCambios = true;
+      return construirUsuarioPrueba(demo, guardado);
     }),
   );
 
-  await guardarUsuarios([...usuarios, ...nuevos]);
+  for (const demo of USUARIOS_PRUEBA) {
+    const correo = normalizarCorreo(demo.correo);
+    if (!resultantes.some((usuario) => usuario.correo === correo)) {
+      resultantes.push(await construirUsuarioPrueba(demo));
+      huboCambios = true;
+    }
+  }
+
+  if (huboCambios) {
+    await guardarUsuarios(resultantes);
+  }
 }
 
 /** Siembra las cuentas de prueba una sola vez por sesión de app. */
@@ -183,6 +227,12 @@ async function asegurarUsuariosPrueba(): Promise<void> {
       });
   }
   await promesaUsuariosPrueba;
+}
+
+/** Fuerza la reparación de las cuentas de prueba sin reiniciar la app. */
+export async function restablecerCuentasPrueba(): Promise<void> {
+  promesaUsuariosPrueba = null;
+  await asegurarUsuariosPrueba();
 }
 
 async function obtenerUsuarios(): Promise<StoredUser[]> {

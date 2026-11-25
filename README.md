@@ -37,6 +37,8 @@ transporte_colombia_front/
 
 La respuesta de seguridad de estas cuentas de prueba es `Prueba` (sin distinción de mayúsculas), con la pregunta `¿Cuál es tu ciudad natal?`.
 
+Estas tres cuentas son administradas por la app: si ya existían en el dispositivo con otra contraseña o con campos incompletos, se reparan automáticamente al abrir la app o al intentar ingresar. Si cambiaste su contraseña manualmente, reinicia la app para restaurar las credenciales de prueba.
+
 ---
 
 ## 2. Arquitectura de Software por Capas
