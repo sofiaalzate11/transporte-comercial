@@ -1,103 +1,406 @@
-import axios from 'axios';
-import { getSecureItem, setSecureItem, deleteSecureItem } from './secure-storage.adapter';
-import { AuthUser, RegistroDatos, Resultado, StoredSession } from '../../domain/entities/auth.model';
-import { API_BASE_URL } from '../config/api.config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
+import {
+  AuthUser,
+  RegistroDatos,
+  Resultado,
+  RolUsuario,
+  StoredSession,
+  StoredUser,
+} from '../../domain/entities/auth.model';
+import {
+  deleteSecureItem,
+  getSecureItem,
+  setSecureItem,
+} from './secure-storage.adapter';
 
+const USUARIOS_KEY = '@transporte:usuarios';
 const SESION_KEY = 'transporte_sesion';
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
-const client = axios.create({ baseURL: API_BASE_URL, timeout: 10000 });
-let verificacionInicialHecha = false;
 
-function mensaje(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const detail = error.response?.data?.message;
-    if (Array.isArray(detail)) return detail.join('. ');
-    if (typeof detail === 'string') return detail;
-    if (!error.response) return `No se pudo conectar al servidor (${API_BASE_URL}). Verifica la red y el backend.`;
+const normalizarCorreo = (correo: string): string => correo.trim().toLowerCase();
+const normalizarRespuesta = (respuesta: string): string =>
+  respuesta.trim().toLowerCase();
+
+interface UsuarioPrueba {
+  nombre: string;
+  correo: string;
+  contrasena: string;
+  rol: RolUsuario;
+}
+
+/** Credenciales de validación del plan QA; se crean una sola vez en el dispositivo. */
+const USUARIOS_PRUEBA: UsuarioPrueba[] = [
+  {
+    nombre: 'Cliente Prueba',
+    correo: 'cliente@transporte.com',
+    contrasena: 'Prueba123!',
+    rol: 'consulta',
+  },
+  {
+    nombre: 'Operador Central',
+    correo: 'operador@transporte.com',
+    contrasena: 'Prueba123!',
+    rol: 'operador',
+  },
+  {
+    nombre: 'Conductor Prueba',
+    correo: 'conductor@transporte.com',
+    contrasena: 'Prueba123!',
+    rol: 'conductor',
+  },
+];
+
+const PREGUNTA_PRUEBA = '¿Cuál es tu ciudad natal?';
+const RESPUESTA_PRUEBA = 'Prueba';
+
+function mensajeError(error: unknown, porDefecto: string): string {
+  return error instanceof Error && error.message ? error.message : porDefecto;
+}
+
+function generarSal(): string {
+  return Array.from(Crypto.getRandomBytes(16))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function generarId(): string {
+  try {
+    return Crypto.randomUUID();
+  } catch {
+    const bytes = Array.from(Crypto.getRandomBytes(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
   }
-  return 'No se pudo completar la solicitud. Inténtalo de nuevo.';
 }
 
-export async function crearUsuario(datos: RegistroDatos): Promise<Resultado<AuthUser>> {
-  try {
-    const { data } = await client.post('/auth/mobile/register', { ...datos, correo: datos.correo.trim().toLowerCase() });
-    return { ok: true, datos: data.usuario };
-  } catch (error) { return { ok: false, error: mensaje(error) }; }
+async function generarHash(valor: string, sal: string): Promise<string> {
+  return Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    `${sal}:${valor}`,
+  );
 }
 
-export async function iniciarSesion(correo: string, contrasena: string): Promise<Resultado<AuthUser>> {
-  try {
-    const { data } = await client.post('/auth/mobile/login', { correo: correo.trim().toLowerCase(), contrasena });
-    await setSecureItem(TOKEN_KEY, data.token);
-    await setSecureItem(USER_KEY, JSON.stringify(data.usuario));
-    return { ok: true, datos: data.usuario };
-  } catch (error) { return { ok: false, error: mensaje(error) }; }
+function compararSeguro(a: string, b: string): boolean {
+  if (a.length !== b.length) {
+    return false;
+  }
+  let diferencia = 0;
+  for (let i = 0; i < a.length; i += 1) {
+    diferencia |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diferencia === 0;
 }
 
-export async function obtenerPreguntaSeguridad(correo: string): Promise<Resultado<string>> {
-  try {
-    const { data } = await client.post('/auth/mobile/recovery/question', { correo: correo.trim().toLowerCase() });
-    return { ok: true, datos: data.pregunta };
-  } catch (error) { return { ok: false, error: mensaje(error) }; }
+function inferirRol(correo: string): AuthUser['rol'] {
+  const valor = correo.toLowerCase();
+  if (valor.includes('operador')) return 'operador';
+  if (valor.includes('cliente')) return 'consulta';
+  return 'conductor';
 }
 
-export async function verificarRespuestaSeguridad(correo: string, respuesta: string): Promise<Resultado<true>> {
+function aUsuarioPublico(usuario: StoredUser): AuthUser {
+  return {
+    id: usuario.id,
+    nombre: usuario.nombre,
+    correo: usuario.correo,
+    rol: usuario.rol ?? inferirRol(usuario.correo),
+  };
+}
+
+async function leerUsuarios(): Promise<StoredUser[]> {
   try {
-    await client.post('/auth/mobile/recovery/verify', { correo: correo.trim().toLowerCase(), respuesta });
+    const crudo = await AsyncStorage.getItem(USUARIOS_KEY);
+    if (!crudo) return [];
+
+    const datos: unknown = JSON.parse(crudo);
+    if (!Array.isArray(datos)) return [];
+
+    return datos.filter(
+      (item): item is StoredUser =>
+        !!item &&
+        typeof item === 'object' &&
+        typeof (item as StoredUser).id === 'string' &&
+        typeof (item as StoredUser).correo === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
+let promesaUsuariosPrueba: Promise<void> | null = null;
+
+async function sembrarUsuariosPrueba(): Promise<void> {
+  const usuarios = await leerUsuarios();
+  const faltantes = USUARIOS_PRUEBA.filter(
+    (usuario) =>
+      !usuarios.some(
+        (guardado) => guardado.correo === normalizarCorreo(usuario.correo),
+      ),
+  );
+
+  if (faltantes.length === 0) {
+    return;
+  }
+
+  const nuevos = await Promise.all(
+    faltantes.map(async (usuario): Promise<StoredUser> => {
+      const contrasenaSal = generarSal();
+      const respuestaSal = generarSal();
+      const [contrasenaHash, respuestaHash] = await Promise.all([
+        generarHash(usuario.contrasena, contrasenaSal),
+        generarHash(normalizarRespuesta(RESPUESTA_PRUEBA), respuestaSal),
+      ]);
+
+      return {
+        id: generarId(),
+        nombre: usuario.nombre,
+        correo: normalizarCorreo(usuario.correo),
+        contrasenaHash,
+        contrasenaSal,
+        preguntaSeguridad: PREGUNTA_PRUEBA,
+        respuestaHash,
+        respuestaSal,
+        rol: usuario.rol,
+        creadoEn: new Date().toISOString(),
+      };
+    }),
+  );
+
+  await guardarUsuarios([...usuarios, ...nuevos]);
+}
+
+/** Siembra las cuentas de prueba una sola vez por sesión de app. */
+async function asegurarUsuariosPrueba(): Promise<void> {
+  if (!promesaUsuariosPrueba) {
+    promesaUsuariosPrueba = sembrarUsuariosPrueba()
+      .then(() => undefined)
+      .catch((error) => {
+        console.warn('[auth.storage] No se pudieron sembrar usuarios de prueba', error);
+      });
+  }
+  await promesaUsuariosPrueba;
+}
+
+async function obtenerUsuarios(): Promise<StoredUser[]> {
+  await asegurarUsuariosPrueba();
+  return leerUsuarios();
+}
+
+async function guardarUsuarios(usuarios: StoredUser[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(USUARIOS_KEY, JSON.stringify(usuarios));
+  } catch {
+    throw new Error(
+      'No se pudo guardar la cuenta en el dispositivo. Verifica el espacio disponible.',
+    );
+  }
+}
+
+async function buscarUsuarioPorCorreo(
+  correo: string,
+): Promise<StoredUser | null> {
+  const usuarios = await obtenerUsuarios();
+  const correoNormalizado = normalizarCorreo(correo);
+  return usuarios.find((usuario) => usuario.correo === correoNormalizado) ?? null;
+}
+
+export async function crearUsuario(
+  datos: RegistroDatos,
+): Promise<Resultado<AuthUser>> {
+  const correo = normalizarCorreo(datos.correo);
+  const usuarios = await obtenerUsuarios();
+
+  if (usuarios.some((usuario) => usuario.correo === correo)) {
+    return { ok: false, error: 'Este correo ya está registrado' };
+  }
+
+  try {
+    const contrasenaSal = generarSal();
+    const respuestaSal = generarSal();
+    const [contrasenaHash, respuestaHash] = await Promise.all([
+      generarHash(datos.contrasena, contrasenaSal),
+      generarHash(normalizarRespuesta(datos.respuestaSeguridad), respuestaSal),
+    ]);
+
+    const usuario: StoredUser = {
+      id: generarId(),
+      nombre: datos.nombre.trim(),
+      correo,
+      contrasenaHash,
+      contrasenaSal,
+      preguntaSeguridad: datos.preguntaSeguridad.trim(),
+      respuestaHash,
+      respuestaSal,
+      rol: datos.rol,
+      creadoEn: new Date().toISOString(),
+    };
+
+    await guardarUsuarios([...usuarios, usuario]);
+    return { ok: true, datos: aUsuarioPublico(usuario) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: mensajeError(error, 'No se pudo crear la cuenta. Inténtalo de nuevo.'),
+    };
+  }
+}
+
+export async function iniciarSesion(
+  correo: string,
+  contrasena: string,
+): Promise<Resultado<AuthUser>> {
+  const usuario = await buscarUsuarioPorCorreo(correo);
+  if (!usuario) {
+    return { ok: false, error: 'Correo o contraseña incorrectos' };
+  }
+
+  try {
+    const hashIngresado = await generarHash(contrasena, usuario.contrasenaSal);
+    if (!compararSeguro(hashIngresado, usuario.contrasenaHash)) {
+      return { ok: false, error: 'Correo o contraseña incorrectos' };
+    }
+
+    const publico = aUsuarioPublico(usuario);
+    await setSecureItem(TOKEN_KEY, `local_${generarId()}`);
+    await setSecureItem(USER_KEY, JSON.stringify(publico));
+    return { ok: true, datos: publico };
+  } catch {
+    return {
+      ok: false,
+      error: 'No se pudo iniciar sesión. Inténtalo de nuevo.',
+    };
+  }
+}
+
+export async function obtenerPreguntaSeguridad(
+  correo: string,
+): Promise<Resultado<string>> {
+  const usuario = await buscarUsuarioPorCorreo(correo);
+  if (!usuario) {
+    return { ok: false, error: 'No existe una cuenta con este correo' };
+  }
+  return { ok: true, datos: usuario.preguntaSeguridad };
+}
+
+export async function verificarRespuestaSeguridad(
+  correo: string,
+  respuesta: string,
+): Promise<Resultado<true>> {
+  const usuario = await buscarUsuarioPorCorreo(correo);
+  if (!usuario) {
+    return { ok: false, error: 'No existe una cuenta con este correo' };
+  }
+
+  try {
+    const hashIngresado = await generarHash(
+      normalizarRespuesta(respuesta),
+      usuario.respuestaSal,
+    );
+    if (!compararSeguro(hashIngresado, usuario.respuestaHash)) {
+      return { ok: false, error: 'La respuesta de seguridad no es correcta' };
+    }
     return { ok: true, datos: true };
-  } catch (error) { return { ok: false, error: mensaje(error) }; }
+  } catch {
+    return { ok: false, error: 'No se pudo verificar la respuesta. Inténtalo de nuevo.' };
+  }
 }
 
-export async function restablecerContrasena(correo: string, respuesta: string, nuevaContrasena: string): Promise<Resultado<true>> {
+export async function restablecerContrasena(
+  correo: string,
+  respuesta: string,
+  nuevaContrasena: string,
+): Promise<Resultado<true>> {
+  const usuarios = await obtenerUsuarios();
+  const correoNormalizado = normalizarCorreo(correo);
+  const indice = usuarios.findIndex((usuario) => usuario.correo === correoNormalizado);
+
+  if (indice === -1) {
+    return { ok: false, error: 'No existe una cuenta con este correo' };
+  }
+
+  const usuario = usuarios[indice];
+
   try {
-    await client.post('/auth/mobile/recovery/reset', { correo: correo.trim().toLowerCase(), respuesta, nuevaContrasena });
+    const hashRespuesta = await generarHash(
+      normalizarRespuesta(respuesta),
+      usuario.respuestaSal,
+    );
+    if (!compararSeguro(hashRespuesta, usuario.respuestaHash)) {
+      return { ok: false, error: 'La respuesta de seguridad no es correcta' };
+    }
+
+    const contrasenaSal = generarSal();
+    const contrasenaHash = await generarHash(nuevaContrasena, contrasenaSal);
+    const usuariosActualizados = [...usuarios];
+    usuariosActualizados[indice] = {
+      ...usuario,
+      contrasenaSal,
+      contrasenaHash,
+    };
+
+    await guardarUsuarios(usuariosActualizados);
     return { ok: true, datos: true };
-  } catch (error) { return { ok: false, error: mensaje(error) }; }
+  } catch (error) {
+    return {
+      ok: false,
+      error: mensajeError(error, 'No se pudo actualizar la contraseña. Inténtalo de nuevo.'),
+    };
+  }
 }
 
 export async function obtenerUsuarioPorId(id: string): Promise<AuthUser | null> {
-  const token = await getSecureItem(TOKEN_KEY);
-  if (!token) return null;
-  try {
-    const { data } = await client.get<AuthUser>('/auth/me', { headers: { Authorization: `Bearer ${token}` } });
-    if (data.id !== id) return null;
-    await setSecureItem(USER_KEY, JSON.stringify(data));
-    return data;
-  } catch (error) {
-    if (axios.isAxiosError(error) && error.response) return null;
-    const raw = await getSecureItem(USER_KEY);
-    if (!raw) return null;
-    const user = JSON.parse(raw) as AuthUser;
-    if (user.id !== id) return null;
-    if (!user.rol) {
-      if (user.correo?.includes('operador')) user.rol = 'operador';
-      else if (user.correo?.includes('cliente')) user.rol = 'consulta';
-      else user.rol = 'conductor';
-    }
-    return user;
-  }
+  const usuarios = await obtenerUsuarios();
+  const usuario = usuarios.find((item) => item.id === id);
+  if (!usuario) return null;
+
+  const publico = aUsuarioPublico(usuario);
+  await setSecureItem(USER_KEY, JSON.stringify(publico));
+  return publico;
 }
 
-export async function guardarSesion(userId: string, recordarme: boolean): Promise<void> {
-  const sesion: StoredSession = { userId, recordarme, creadoEn: new Date().toISOString() };
+export async function guardarSesion(
+  userId: string,
+  recordarme: boolean,
+): Promise<void> {
+  const sesion: StoredSession = {
+    userId,
+    recordarme,
+    creadoEn: new Date().toISOString(),
+  };
   await setSecureItem(SESION_KEY, JSON.stringify(sesion));
 }
 
+let verificacionInicialHecha = false;
+
+/**
+ * Devuelve la sesión guardada. En el primer acceso tras abrir la app, las
+ * sesiones sin "Recordarme" se descartan para volver a pedir el login.
+ */
 export async function obtenerSesion(): Promise<StoredSession | null> {
   try {
-    const raw = await getSecureItem(SESION_KEY);
-    const session: StoredSession | null = raw ? JSON.parse(raw) : null;
-    const firstRead = !verificacionInicialHecha;
+    const crudo = await getSecureItem(SESION_KEY);
+    const sesion: StoredSession | null = crudo ? JSON.parse(crudo) : null;
+    const primeraLectura = !verificacionInicialHecha;
     verificacionInicialHecha = true;
-    if (!session?.userId || (firstRead && !session.recordarme)) {
+
+    if (!sesion?.userId || (primeraLectura && !sesion.recordarme)) {
       await borrarSesion();
       return null;
     }
-    return session;
-  } catch { await borrarSesion(); return null; }
+    return sesion;
+  } catch {
+    verificacionInicialHecha = true;
+    await borrarSesion();
+    return null;
+  }
 }
 
 export async function borrarSesion(): Promise<void> {
-  await Promise.all([SESION_KEY, TOKEN_KEY, USER_KEY].map((key) => deleteSecureItem(key)));
+  await Promise.all(
+    [SESION_KEY, TOKEN_KEY, USER_KEY].map((key) => deleteSecureItem(key)),
+  );
 }

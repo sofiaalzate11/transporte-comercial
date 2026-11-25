@@ -25,6 +25,18 @@ transporte_colombia_front/
 
 > **Nota:** El backend NestJS se gestiona de forma desacoplada en el repositorio `Transporte-Comercial-BACK`.
 
+> **Autenticación:** El registro, inicio de sesión y recuperación de contraseña funcionan de forma local (AsyncStorage + hashes SHA-256 con sal), sin necesidad de iniciar el backend. Las cuentas y la sesión se guardan en el dispositivo. El registro permite elegir el rol (`consulta`, `operador` o `conductor`).
+
+**Credenciales de prueba** (se crean automáticamente la primera vez que se abre la app):
+
+| Rol | Correo | Contraseña |
+| :--- | :--- | :--- |
+| Cliente / consulta | `cliente@transporte.com` | `Prueba123!` |
+| Operador central | `operador@transporte.com` | `Prueba123!` |
+| Conductor | `conductor@transporte.com` | `Prueba123!` |
+
+La respuesta de seguridad de estas cuentas de prueba es `Prueba` (sin distinción de mayúsculas), con la pregunta `¿Cuál es tu ciudad natal?`.
+
 ---
 
 ## 2. Arquitectura de Software por Capas

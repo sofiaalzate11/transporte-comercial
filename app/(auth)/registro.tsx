@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { RolUsuario } from '../../src/domain/entities/auth.model';
 import { useAuth } from '../../src/presentation/context/AuthContext';
 import { AuthScreen } from '../../src/presentation/components/ui/AuthScreen';
 import { Button } from '../../src/presentation/components/ui/Button';
@@ -12,6 +13,12 @@ import {
   validarRequerido,
 } from '../../src/shared/utils/auth.validation';
 
+const ROLES: Array<{ valor: RolUsuario; etiqueta: string }> = [
+  { valor: 'consulta', etiqueta: 'Cliente (consulta de remesas)' },
+  { valor: 'operador', etiqueta: 'Operador de central (despachos)' },
+  { valor: 'conductor', etiqueta: 'Conductor (checklists y entrega)' },
+];
+
 const PREGUNTAS_SEGURIDAD = [
   '¿Cuál es el nombre de tu primera mascota?',
   '¿Cuál es el nombre de tu ciudad natal?',
@@ -21,7 +28,13 @@ const PREGUNTAS_SEGURIDAD = [
 
 type ErroresRegistro = Partial<
   Record<
-    'nombre' | 'correo' | 'contrasena' | 'confirmar' | 'pregunta' | 'respuesta',
+    | 'nombre'
+    | 'correo'
+    | 'contrasena'
+    | 'confirmar'
+    | 'rol'
+    | 'pregunta'
+    | 'respuesta',
     string
   >
 >;
@@ -34,6 +47,7 @@ export default function RegistroScreen() {
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
   const [confirmar, setConfirmar] = useState('');
+  const [rol, setRol] = useState<RolUsuario | null>(null);
   const [pregunta, setPregunta] = useState('');
   const [respuesta, setRespuesta] = useState('');
   const [errores, setErrores] = useState<ErroresRegistro>({});
@@ -56,6 +70,7 @@ export default function RegistroScreen() {
         : contrasena !== confirmar
           ? 'Las contraseñas no coinciden'
           : undefined,
+      rol: rol ? undefined : 'Selecciona el tipo de cuenta',
       pregunta: pregunta ? undefined : 'Selecciona una pregunta de seguridad',
       respuesta:
         validarRequerido(
@@ -72,7 +87,7 @@ export default function RegistroScreen() {
     setErrores(nuevosErrores);
     setErrorGeneral(null);
 
-    if (Object.values(nuevosErrores).some(Boolean)) {
+    if (Object.values(nuevosErrores).some(Boolean) || !rol) {
       return;
     }
 
@@ -83,6 +98,7 @@ export default function RegistroScreen() {
       contrasena,
       preguntaSeguridad: pregunta,
       respuestaSeguridad: respuesta,
+      rol,
     });
     setEnviando(false);
 
@@ -178,6 +194,47 @@ export default function RegistroScreen() {
         textContentType="newPassword"
         editable={!enviando}
       />
+
+      <View style={styles.bloquePregunta}>
+        <Text style={styles.etiqueta}>Tipo de cuenta</Text>
+        <View style={styles.listaPreguntas}>
+          {ROLES.map((opcion) => {
+            const seleccionado = rol === opcion.valor;
+            return (
+              <TouchableOpacity
+                key={opcion.valor}
+                style={[
+                  styles.opcionPregunta,
+                  seleccionado && styles.opcionSeleccionada,
+                ]}
+                onPress={() => {
+                  setRol(opcion.valor);
+                  limpiarError('rol');
+                }}
+                disabled={enviando}
+                activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: seleccionado }}
+              >
+                <View style={[styles.radio, seleccionado && styles.radioActivo]}>
+                  {seleccionado ? <View style={styles.radioPunto} /> : null}
+                </View>
+                <Text
+                  style={[
+                    styles.textoPregunta,
+                    seleccionado && styles.textoPreguntaSeleccionada,
+                  ]}
+                >
+                  {opcion.etiqueta}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {errores.rol ? (
+          <Text style={styles.errorPregunta}>{errores.rol}</Text>
+        ) : null}
+      </View>
 
       <View style={styles.bloquePregunta}>
         <Text style={styles.etiqueta}>Pregunta de seguridad</Text>

@@ -7,10 +7,8 @@ import { Button } from '../../src/presentation/components/ui/Button';
 import { Checkbox } from '../../src/presentation/components/ui/Checkbox';
 import { MessageBanner } from '../../src/presentation/components/ui/MessageBanner';
 import { TextField } from '../../src/presentation/components/ui/TextField';
-import {
-  validarContrasena,
-  validarCorreo,
-} from '../../src/shared/utils/auth.validation';
+import { TrackingClienteModal } from '../../src/presentation/components/TrackingClienteModal';
+import { validarCorreo } from '../../src/shared/utils/auth.validation';
 
 type ErroresLogin = {
   correo?: string;
@@ -36,6 +34,7 @@ export default function LoginScreen() {
     mensajeParam ?? null,
   );
   const [enviando, setEnviando] = useState(false);
+  const [verTracking, setVerTracking] = useState(false);
 
   useEffect(() => {
     if (correoParam) {
@@ -143,6 +142,16 @@ export default function LoginScreen() {
         style={styles.botonPrincipal}
       />
 
+      <TouchableOpacity
+        onPress={() => setVerTracking(true)}
+        accessibilityRole="button"
+        style={styles.enlaceTracking}
+      >
+        <Text style={styles.textoTracking}>
+          Consultar el estado de una remesa sin iniciar sesión
+        </Text>
+      </TouchableOpacity>
+
       <View style={styles.pie}>
         <Text style={styles.pieTexto}>¿No tienes cuenta?</Text>
         <TouchableOpacity
@@ -152,6 +161,11 @@ export default function LoginScreen() {
           <Text style={styles.enlacePie}>Crear cuenta</Text>
         </TouchableOpacity>
       </View>
+
+      <TrackingClienteModal
+        visible={verTracking}
+        onClose={() => setVerTracking(false)}
+      />
     </AuthScreen>
   );
 }
@@ -173,6 +187,16 @@ const styles = StyleSheet.create({
   },
   botonPrincipal: {
     marginTop: 20,
+  },
+  enlaceTracking: {
+    alignItems: 'center',
+    marginTop: 18,
+  },
+  textoTracking: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1e3a8a',
+    textDecorationLine: 'underline',
   },
   pie: {
     marginTop: 22,

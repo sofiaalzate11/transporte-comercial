@@ -1,3 +1,5 @@
+export type RolUsuario = 'conductor' | 'operador' | 'consulta';
+
 export interface StoredUser {
   id: string;
   nombre: string;
@@ -7,6 +9,8 @@ export interface StoredUser {
   preguntaSeguridad: string;
   respuestaHash: string;
   respuestaSal: string;
+  /** Opcional por compatibilidad con cuentas guardadas antes del selector de rol. */
+  rol?: RolUsuario;
   creadoEn: string;
 }
 
@@ -14,7 +18,7 @@ export interface AuthUser {
   id: string;
   nombre: string;
   correo: string;
-  rol?: 'conductor' | 'operador' | 'consulta' | string;
+  rol?: RolUsuario | string;
 }
 
 export interface RegistroDatos {
@@ -23,6 +27,7 @@ export interface RegistroDatos {
   contrasena: string;
   preguntaSeguridad: string;
   respuestaSeguridad: string;
+  rol: RolUsuario;
 }
 
 export interface StoredSession {
